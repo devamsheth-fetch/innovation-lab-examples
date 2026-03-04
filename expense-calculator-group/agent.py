@@ -344,6 +344,8 @@ def _extract_group_size_flexible(text: str) -> int | None:
         r"(?:group\s*size|participants)\s+(\d+)",
         r"\bwe\s+are\s+(\d+)\b",
         r"\b(\d+)\s+(?:people|members|participants)\b",
+        r"\b(?:we\'?re|we\s+are)\s+(\d+)\b",
+        r"(\d+)\s+of\s+us\b",
     ]
     for p in patterns:
         m = re.search(p, t, re.IGNORECASE)
@@ -375,7 +377,7 @@ def _extract_payer_name_from_text(raw_text: str) -> str | None:
     """
     Extract payer name from flexible text, e.g.
     - "paid by rutuja"
-    - "this bill is paid by rutuja please continue"
+    - "rutuja paid" / "Rutuja paid"
     - "rutuja paid this bill"
     - "payer is rutuja"
     """
@@ -386,6 +388,7 @@ def _extract_payer_name_from_text(raw_text: str) -> str | None:
     patterns = [
         r"\bpaid\s+by\s+([A-Za-z][A-Za-z0-9 _-]{0,80})",
         r"\b([A-Za-z][A-Za-z0-9 _-]{0,80})\s+paid\s+(?:this\s+)?bill\b",
+        r"\b([A-Za-z][A-Za-z0-9 _-]{0,80})\s+paid\b",  # short: "Rutuja paid"
         r"\bpayer\s*(?:is|:)\s*([A-Za-z][A-Za-z0-9 _-]{0,80})",
     ]
 
@@ -399,9 +402,9 @@ def _extract_payer_name_from_text(raw_text: str) -> str | None:
     if not candidate:
         return None
 
-    # Trim trailing command-like words if present in same message.
+    # Trim trailing command-like or number phrases (e.g. "2 people") if present in same message.
     candidate = re.split(
-        r"\b(group\s*size|participants|done|start\s+poll|calculate|pending|please|thanks|thank\s+you|continue|proceed|then)\b",
+        r"\b(group\s*size|participants|\d+\s*(?:people|members)|done|start\s+poll|calculate|pending|please|thanks|thank\s+you|continue|proceed|then)\b",
         candidate,
         maxsplit=1,
         flags=re.IGNORECASE,
@@ -464,6 +467,25 @@ def _build_poll_text(receipt: Receipt) -> str:
     )
 
 
+def _next_step_message(state: str, has_items: bool) -> str:
+    """Return context-aware next-step hint instead of generic 'send a photo'."""
+    if not has_items:
+        return "Send a receipt photo or type **help** for commands."
+    if state == "draft":
+        return (
+            "Next: say **done** to start the poll, or add more items with **add &lt;name&gt; &lt;price&gt;**.\n"
+            "You can set payer (e.g. **Rutuja paid**) or **group size 3**. Type **help** for all commands."
+        )
+    if state == "polling":
+        return (
+            "Reply with name and item numbers (e.g. **RNF: 1 2 3**). Use **pending** to see who is left.\n"
+            "When everyone has replied, say **calculate summary** or **calculate detailed**."
+        )
+    if state == "done":
+        return "Say **calculate summary** or **calculate detailed** to see the split, or **help** for commands."
+    return "Type **help** for commands."
+
+
 WELCOME = """🧾 **Receipt / Expense Calculator**
 
 Send a **photo of your receipt** and I’ll extract the line items, or add items manually.
@@ -474,10 +496,10 @@ Send a **photo of your receipt** and I’ll extract the line items, or add items
 
 **Poll:** Say **done**. Each person replies with name and numbers.
 Examples: `RNF: 1 2 3`, `I'm RNF 1 2 3`, `RNF took 1 2 3`.
-Optional: set expected participants with `group size 3`.
+Optional: set expected participants with `group size 3` or `2 people`.
 
 **Payer:** Set who paid the bill.
-Examples: `Rutuja paid this bill` or `I paid this bill`.
+Examples: `Rutuja paid`, `Rutuja paid this bill`, or `I paid`.
 
 **Split:** Use `calculate summary` for compact totals table, `calculate detailed` (or `calculate table`) for full tables, or `calculate readable` for narrative breakdown.
 
@@ -537,24 +559,31 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
             data = download_image_resource(ctx, item)
             if data:
                 image_bytes = data
-        elif isinstance(item, dict) and (item.get("type") == "resource" or item.get("type") == "image"):
-            # Content may arrive as raw dict from some clients (e.g. ASI-One)
-            saw_attachment = True
-            rid = item.get("resource_id") or item.get("resourceId")
-            res = item.get("resource")
-            if rid or res:
-                resources_list = None
-                if res is not None:
-                    resources_list = res if isinstance(res, list) else [res]
-                if rid:
-                    ctx.logger.info(f"Received resource (dict): {rid}")
-                    data = _download_image_bytes(ctx, str(rid), resources_list)
+        elif isinstance(item, dict):
+            # Content may arrive as raw dict from some clients (e.g. ASI-One),
+            # sometimes without a strict `type` field of "resource" or "image".
+            # Be flexible and treat any dict that looks like it has a resource
+            # identifier or URI as an attachment.
+            suspected_type = (item.get("type") or "").lower()
+            if suspected_type in ("resource", "image", "attachment", "file") or any(
+                key in item for key in ("resource_id", "resourceId", "resource", "uri", "url")
+            ):
+                saw_attachment = True
+                rid = item.get("resource_id") or item.get("resourceId")
+                res = item.get("resource")
+                if rid or res:
+                    resources_list = None
+                    if res is not None:
+                        resources_list = res if isinstance(res, list) else [res]
+                    if rid:
+                        ctx.logger.info(f"Received resource (dict): {rid}")
+                        data = _download_image_bytes(ctx, str(rid), resources_list)
+                    else:
+                        data = _download_image_bytes(ctx, "", resources_list) if resources_list else None
+                    if data:
+                        image_bytes = data
                 else:
-                    data = _download_image_bytes(ctx, "", resources_list) if resources_list else None
-                if data:
-                    image_bytes = data
-            else:
-                ctx.logger.warning("Resource dict missing resource_id and resource/uri")
+                    ctx.logger.warning("Resource dict missing resource_id and resource/uri")
         else:
             ctx.logger.debug(f"Content item type: {type(item).__name__}")
 
@@ -600,7 +629,7 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
 
             # Payer hints from first message text
             payer_set = False
-            if re.match(r"^i\s+paid\s+this\s+bill\.?$", raw_text, re.IGNORECASE):
+            if re.match(r"^i\s+paid(?:\s+this\s+bill)?\.?$", raw_text, re.IGNORECASE):
                 payer_name = names.get(sender) or "Payer"
                 ctx.storage.set(RECEIPT_PAYER_SENDER, sender)
                 ctx.storage.set(RECEIPT_PAYER_NAME, payer_name)
@@ -680,7 +709,8 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
                 ),
             )
         else:
-            await ctx.send(sender, text_msg("Send a receipt photo or type **help** for commands."))
+            state, receipt, _ = _load_receipt(ctx)
+            await ctx.send(sender, text_msg(_next_step_message(state, bool(receipt.items))))
         return
 
     state, receipt, selections = _load_receipt(ctx)
@@ -698,56 +728,49 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
         await ctx.send(sender, text_msg("✅ New receipt started. Add items with **add &lt;name&gt; &lt;price&gt;** or send a receipt photo."))
         return
 
-    # Optional: explicitly set total expected participants in this round
-    expected = _extract_group_size_flexible(text)
-    if expected is not None and state in ("draft", "polling", "done"):
-        if expected < 1:
-            await ctx.send(sender, text_msg("Group size must be at least 1."))
-            return
-        if expected > 50:
-            await ctx.send(sender, text_msg("Group size is too large. Use a value up to 50."))
-            return
-        ctx.storage.set(RECEIPT_EXPECTED_COUNT, expected)
-        await ctx.send(
-            sender,
-            text_msg(
-                f"✅ Expected participants set to **{expected}** for this receipt.\n"
-                "Use **pending** to check progress."
-            ),
-        )
-        return
-
-    # Set payer command
-    # Examples: "Rutuja paid this bill", "I paid this bill"
+    # Payer and/or group size in one message (e.g. "Rutuja paid" or "2 people" or "Rutuja paid 2 people")
     if state in ("draft", "polling", "done"):
         names = ctx.storage.get(RECEIPT_NAMES) or {}
-        if re.match(r"^i\s+paid\s+this\s+bill\.?$", raw_text, re.IGNORECASE):
-            payer_name = names.get(sender) or "Payer"
-            ctx.storage.set(RECEIPT_PAYER_SENDER, sender)
-            ctx.storage.set(RECEIPT_PAYER_NAME, payer_name)
-            await ctx.send(sender, text_msg(f"✅ Payer set to **{payer_name}**."))
-            return
+        expected = _extract_group_size_flexible(text)
+        payer_name_from_text: str | None = None
+        if re.match(r"^i\s+paid(?:\s+this\s+bill)?\.?$", raw_text, re.IGNORECASE):
+            payer_name_from_text = names.get(sender) or "Payer"
+            payer_sender_val = sender
+        else:
+            payer_name_from_text = _extract_payer_name_from_text(raw_text)
+            payer_sender_val = None
+            if payer_name_from_text:
+                for sid, nm in names.items():
+                    if (nm or "").strip().lower() == payer_name_from_text.lower():
+                        payer_sender_val = sid
+                        break
+                if not payer_sender_val and names.get(sender) and (names.get(sender) or "").strip().lower() == payer_name_from_text.lower():
+                    payer_sender_val = sender
 
-        payer_name = _extract_payer_name_from_text(raw_text)
-        if payer_name:
-            payer_sender = None
-            for sid, nm in names.items():
-                if (nm or "").strip().lower() == payer_name.lower():
-                    payer_sender = sid
-                    break
-            # If this sender is naming themselves, map to sender as payer
-            if not payer_sender and names.get(sender) and names.get(sender).strip().lower() == payer_name.lower():
-                payer_sender = sender
-            ctx.storage.set(RECEIPT_PAYER_SENDER, payer_sender)
-            ctx.storage.set(RECEIPT_PAYER_NAME, payer_name)
-            await ctx.send(
-                sender,
-                text_msg(
-                    f"✅ Payer set to **{payer_name}**.\n"
-                    "Tip: if payer is in this group, they should also submit their items so settlement is exact."
-                ),
-            )
-            return
+        if expected is not None or payer_name_from_text is not None:
+            lines: list[str] = []
+            if expected is not None:
+                if expected < 1:
+                    await ctx.send(sender, text_msg("Group size must be at least 1."))
+                    return
+                if expected > 50:
+                    await ctx.send(sender, text_msg("Group size is too large. Use a value up to 50."))
+                    return
+                ctx.storage.set(RECEIPT_EXPECTED_COUNT, expected)
+                lines.append(f"✅ Expected participants set to **{expected}**.")
+            if payer_name_from_text:
+                ctx.storage.set(RECEIPT_PAYER_SENDER, payer_sender_val)
+                ctx.storage.set(RECEIPT_PAYER_NAME, payer_name_from_text)
+                lines.append(f"✅ Payer set to **{payer_name_from_text}**.")
+            if lines:
+                msg_body = "\n".join(lines)
+                if payer_name_from_text:
+                    msg_body += "\n\nTip: if payer is in this group, they should also submit their items so settlement is exact."
+                if expected is not None and not payer_name_from_text:
+                    msg_body += "\n\nUse **pending** to check progress."
+                msg_body += "\n\n" + _next_step_message(state, bool(receipt.items))
+                await ctx.send(sender, text_msg(msg_body))
+                return
 
     add_match = re.match(r"add\s+(.+?)\s+\$?([\d.]+)\s*$", text, re.I)
     if add_match:
@@ -1141,16 +1164,10 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
         return
 
     if state == "polling":
-        await ctx.send(
-            sender,
-            text_msg(
-                "Reply with name and item numbers. Examples: **RNF: 1 2 3** or **I'm RNF 1 2 3**.\n"
-                "Use **pending** to see who is left."
-            ),
-        )
+        await ctx.send(sender, text_msg(_next_step_message(state, bool(receipt.items))))
         return
 
-    await ctx.send(sender, text_msg("Send a receipt photo or type **help** for commands."))
+    await ctx.send(sender, text_msg(_next_step_message(state, bool(receipt.items))))
 
 
 @chat_proto.on_message(ChatAcknowledgement)
