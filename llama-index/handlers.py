@@ -101,10 +101,18 @@ async def handle_commit_payment(ctx: Context, sender: str, msg: CommitPayment):
         await ctx.send(sender, RejectPayment(reason="Unsupported payment method (expected stripe)."))
         return
 
+    # Verify the transaction_id matches the checkout session we created for this user
+    pending = ctx.storage.get(f"pending_stripe:{sender}")
+    if not pending or pending.get("checkout_session_id") != msg.transaction_id:
+        ctx.logger.warning(f"Unknown or mismatched Stripe session for {sender[:20]}...")
+        await ctx.send(sender, RejectPayment(reason="No matching payment session found."))
+        return
+
     paid = await asyncio.to_thread(verify_checkout_session_paid, msg.transaction_id)
 
     if paid:
         ctx.logger.info(f"Stripe payment VERIFIED for {sender[:20]}...")
+        ctx.storage.remove(f"pending_stripe:{sender}")
         await ctx.send(sender, CompletePayment(transaction_id=msg.transaction_id))
         await run_pending_ingestion(ctx, sender)
     else:
