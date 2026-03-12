@@ -13,11 +13,10 @@ from uagents_core.contrib.protocols.chat import (
 from uagents_core.contrib.protocols.payment import (
     CommitPayment,
     CompletePayment,
-    CancelPayment,
     RejectPayment,
 )
 
-from config import chat_proto, payment_proto, ANALYSIS_FEE
+from config import chat_proto, payment_proto
 from rag import (
     URL_PATTERN,
     _collection_name,
@@ -28,12 +27,8 @@ from rag import (
     reset_user_session,
     collection_has_points,
 )
-from payment import (
-    verify_fet_payment_to_agent,
-    validate_and_consume_session,
-    request_payment_from_user,
-    get_agent_wallet,
-)
+from payment import request_payment_from_user
+from stripe_payments import verify_checkout_session_paid, format_price
 
 
 # ── Reply helper ──────────────────────────────────────────────────────
@@ -102,54 +97,23 @@ async def run_pending_ingestion(ctx: Context, sender: str):
 async def handle_commit_payment(ctx: Context, sender: str, msg: CommitPayment):
     ctx.logger.info(f"CommitPayment from {sender[:20]}... tx={msg.transaction_id}")
 
-    # Validate payment session reference
-    stored_ref = ctx.storage.get(f"payment_ref:{sender}")
-    if stored_ref and not validate_and_consume_session(stored_ref, msg.transaction_id):
-        ctx.logger.warning(f"Invalid or already-consumed payment session for {sender[:20]}...")
-        await ctx.send(
-            sender,
-            CancelPayment(
-                transaction_id=msg.transaction_id,
-                reason="Payment session invalid or already used.",
-            ),
-        )
-        await reply(ctx, sender, "Payment session expired or already used. Please send the URL again.")
+    if msg.funds.payment_method != "stripe" or not msg.transaction_id:
+        await ctx.send(sender, RejectPayment(reason="Unsupported payment method (expected stripe)."))
         return
 
-    payment_verified = False
+    paid = await asyncio.to_thread(verify_checkout_session_paid, msg.transaction_id)
 
-    if msg.funds.payment_method == "fet_direct" and msg.funds.currency == "FET":
-        buyer_wallet = None
-        if isinstance(msg.metadata, dict):
-            buyer_wallet = msg.metadata.get("buyer_fet_wallet") or msg.metadata.get("buyer_fet_address")
-
-        if buyer_wallet:
-            # Offload blocking ledger RPC to a thread
-            payment_verified = await asyncio.to_thread(
-                verify_fet_payment_to_agent,
-                transaction_id=msg.transaction_id,
-                expected_amount_fet=ANALYSIS_FEE,
-                sender_fet_address=buyer_wallet,
-                recipient_agent_wallet=get_agent_wallet(),
-                logger=ctx.logger,
-            )
-        else:
-            ctx.logger.warning("No buyer wallet address in CommitPayment metadata")
-
-    if payment_verified:
-        ctx.logger.info(f"Payment VERIFIED for {sender[:20]}...")
+    if paid:
+        ctx.logger.info(f"Stripe payment VERIFIED for {sender[:20]}...")
         await ctx.send(sender, CompletePayment(transaction_id=msg.transaction_id))
         await run_pending_ingestion(ctx, sender)
     else:
-        ctx.logger.warning(f"Payment REJECTED for {sender[:20]}...")
+        ctx.logger.warning(f"Stripe payment NOT completed for {sender[:20]}...")
         await ctx.send(
             sender,
-            CancelPayment(
-                transaction_id=msg.transaction_id,
-                reason="Payment verification failed. Please ensure you sent the correct amount.",
-            ),
+            RejectPayment(reason="Stripe payment not completed yet. Please finish checkout."),
         )
-        await reply(ctx, sender, "Payment verification failed. Please try again.")
+        await reply(ctx, sender, "Payment not completed. Please finish the Stripe checkout and try again.")
 
 
 @payment_proto.on_message(RejectPayment)
@@ -179,7 +143,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
         ctx.storage.set(f"pending_url:{sender}", text)
         await request_payment_from_user(
             ctx, sender,
-            description=f"RAG document ingestion fee: {ANALYSIS_FEE} FET",
+            description=f"RAG document ingestion — {format_price()}",
         )
         return
 

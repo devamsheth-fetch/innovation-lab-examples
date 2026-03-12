@@ -1,6 +1,6 @@
 # Fetch RAG Agent — LlamaIndex + Qdrant
 
-A Fetch.ai uAgent that turns any document into a queryable knowledge base. Send a URL, pay a small FET fee, and ask questions — powered by LlamaIndex's ReAct agent and Qdrant vector search.
+A Fetch.ai uAgent that turns any document into a queryable knowledge base. Send a URL, pay via Stripe, and ask questions — powered by LlamaIndex's ReAct agent and Qdrant vector search.
 
 ## How It Works
 
@@ -8,7 +8,7 @@ A Fetch.ai uAgent that turns any document into a queryable knowledge base. Send 
   User sends document URL
          │
          ▼
-  Agent requests 0.1 FET payment
+  Agent requests Stripe payment
          │
          ▼
   Download ─► Chunk ─► Embed ─► Store in Qdrant
@@ -20,7 +20,7 @@ A Fetch.ai uAgent that turns any document into a queryable knowledge base. Send 
   ReAct agent reasons ─► retrieves chunks ─► answers with citations
 ```
 
-1. **Ingest** — Send a document URL (PDF, HTML, etc.). After payment, the agent downloads it, splits into chunks (512 tokens, 50 overlap), embeds with `text-embedding-3-small`, and stores in a per-user Qdrant collection.
+1. **Ingest** — Send a document URL (PDF, HTML, etc.). After Stripe payment, the agent downloads it, splits into chunks (512 tokens, 50 overlap), embeds with `text-embedding-3-small`, and stores in a per-user Qdrant collection.
 
 2. **Query** — Ask a question. The LlamaIndex ReAct agent decides when to search the vector store, retrieves the top-k relevant chunks, and synthesizes an answer with `gpt-4o-mini`. Responses include source citations with page numbers and confidence scores.
 
@@ -33,7 +33,8 @@ llama-index/
 ├── main.py            Entry point — wires agent, protocols, startup
 ├── config.py          Env vars, Qdrant/LlamaIndex clients, agent setup
 ├── rag.py             Core RAG: download, ingest, ReAct agent, citations
-├── payment.py         On-chain FET payment verification (cosmpy)
+├── payment.py         Stripe payment request logic
+├── stripe_payments.py Stripe embedded checkout + verification
 ├── handlers.py        Chat + payment protocol message handlers
 ├── requirements.txt   Dependencies
 ├── .env.example       Environment variable template
@@ -46,8 +47,9 @@ llama-index/
 |------|------|
 | **`config.py`** | Loads env vars, creates Qdrant clients (sync + async), OpenAI embedding model, LLM, and the Fetch.ai agent with chat/payment protocols |
 | **`rag.py`** | Downloads documents, runs the LlamaIndex `IngestionPipeline` (SentenceSplitter → OpenAI embeddings → Qdrant), builds a `ReActAgent` with a `QueryEngineTool` over the vector store, and formats citations |
-| **`payment.py`** | Verifies FET payments on-chain by querying the Fetch.ai ledger via `cosmpy` — checks sender, recipient, and amount against the transaction hash |
-| **`handlers.py`** | Message routing: URLs trigger the payment→ingest flow, plain text triggers the ReAct query agent, payment confirmations trigger on-chain verification |
+| **`payment.py`** | Builds and sends Stripe payment requests to users via the Agentverse payment protocol |
+| **`stripe_payments.py`** | Creates embedded Stripe Checkout Sessions and verifies payment status |
+| **`handlers.py`** | Message routing: URLs trigger the payment→ingest flow, plain text triggers the ReAct query agent, payment confirmations trigger Stripe verification |
 | **`main.py`** | Registers protocols, sets the wallet, defines the startup event, and calls `agent.run()` |
 
 ## Setup
@@ -57,7 +59,7 @@ llama-index/
 - Python 3.12+
 - [Qdrant Cloud](https://cloud.qdrant.io/) cluster
 - [OpenAI API key](https://platform.openai.com/api-keys)
-- FET testnet tokens (auto-funded on first run)
+- [Stripe API keys](https://dashboard.stripe.com/test/apikeys) (test mode)
 
 ### Install
 
@@ -81,7 +83,8 @@ QDRANT_URL=https://your-cluster.cloud.qdrant.io:6333
 QDRANT_API_KEY=your-qdrant-api-key
 OPENAI_API_KEY=sk-your-openai-key
 AGENT_SEED=your-unique-agent-seed
-FET_USE_TESTNET=true
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
 ```
 
 #### Optional tuning (all have defaults)
@@ -94,7 +97,10 @@ FET_USE_TESTNET=true
 | `CHAT_MEMORY_TOKEN_LIMIT` | `3900` | Chat history token budget |
 | `EMBED_MODEL` | `text-embedding-3-small` | OpenAI embedding model |
 | `LLM_MODEL` | `gpt-4o-mini` | OpenAI LLM for reasoning |
-| `ANALYSIS_FEE` | `0.1` | FET cost per document ingestion |
+| `STRIPE_AMOUNT_CENTS` | `100` | Price in cents per document ingestion |
+| `STRIPE_CURRENCY` | `usd` | Stripe currency code |
+| `STRIPE_PRODUCT_NAME` | `RAG Document Ingestion` | Product name shown at checkout |
+| `STRIPE_SUCCESS_URL` | `https://agentverse.ai` | Redirect URL after payment |
 | `AGENT_PORT` | `8000` | Local HTTP port |
 
 ### Run
@@ -113,7 +119,7 @@ Interact with the agent through the Agentverse chat UI.
 ```
 https://example.com/report.pdf
 ```
-> Agent requests 0.1 FET. After payment, the document is downloaded, chunked, embedded, and stored.
+> Agent requests Stripe payment. After checkout, the document is downloaded, chunked, embedded, and stored.
 
 **Ask questions:**
 ```
@@ -154,5 +160,5 @@ Retrieved from 5 source(s)
 | Vector store | [Qdrant Cloud](https://qdrant.tech/) |
 | Embeddings | OpenAI `text-embedding-3-small` |
 | LLM | OpenAI `gpt-4o-mini` |
-| Payments | FET tokens on Dorado testnet via `cosmpy` |
+| Payments | [Stripe](https://stripe.com/) embedded checkout |
 | Messaging | Agentverse mailbox + chat/payment protocols |
