@@ -1,0 +1,9 @@
+"""
+Ensure payment-approval/ is on sys.path so 'import main' works in tests.
+"""
+import sys
+import os
+
+parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent not in sys.path:
+    sys.path.insert(0, parent)

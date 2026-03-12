@@ -1,0 +1,5 @@
+ag2[openai,mcp]>=0.11.0
+mcp>=1.0.0
+uagents>=0.20.0
+uagents-adapter>=0.4.0
+python-dotenv>=1.0.0
