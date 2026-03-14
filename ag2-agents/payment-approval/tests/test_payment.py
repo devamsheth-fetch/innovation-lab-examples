@@ -12,10 +12,13 @@ def test_executor_human_input_mode():
     import main as m
     assert m.executor.human_input_mode == "ALWAYS"
 
-def test_researcher_termination_condition():
+def test_researcher_no_custom_termination():
+    """Researcher has no custom is_termination_msg. It produces 'ASSESSMENT COMPLETE'
+    but is_termination_msg evaluates *received* messages only — a self-termination
+    check would be dead code. Conversation ends via max_turns or executor's TERMINATE."""
     import main as m
-    assert m.researcher._is_termination_msg({"content": "Risk: low. ASSESSMENT COMPLETE"}) is True
-    assert m.researcher._is_termination_msg({"content": "Still investigating..."}) is False
+    # Default termination returns False for everything
+    assert m.researcher._is_termination_msg({"content": "ASSESSMENT COMPLETE"}) is False
 
 def test_executor_termination_condition():
     import main as m

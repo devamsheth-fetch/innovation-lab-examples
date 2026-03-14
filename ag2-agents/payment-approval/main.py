@@ -34,7 +34,7 @@ researcher = ConversableAgent(
         "End your assessment with ASSESSMENT COMPLETE."
     ),
     llm_config=llm_config,
-    is_termination_msg=lambda m: "ASSESSMENT COMPLETE" in (m.get("content") or ""),
+    # Conversation ends via max_turns or executor's TERMINATE check.
 )
 
 executor = ConversableAgent(
