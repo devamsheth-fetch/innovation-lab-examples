@@ -12,11 +12,11 @@ from agent_executor import AG2ResearchExecutor
 load_dotenv()
 
 llm_config = LLMConfig(
-    config_list=[{
+    {
         "model": os.getenv("LLM_MODEL", "gpt-4o-mini"),
         "api_key": os.getenv("OPENAI_API_KEY", ""),
         "base_url": os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
-    }],
+    },
     temperature=0.3,
     cache_seed=None,
 )

@@ -33,3 +33,19 @@ def test_executor_instantiates():
         is_termination_msg=lambda m: "TERMINATE" in (m.get("content") or ""),
     )
     assert executor.name == "executor"
+
+
+def test_llmconfig_positional_dict_construction():
+    """Validate the positional-dict LLMConfig used in main.py works with AG2 0.11+."""
+    cfg = LLMConfig(
+        {"model": "gpt-4o-mini", "api_key": "test-key", "base_url": "https://api.openai.com/v1"},
+        temperature=0.3,
+        cache_seed=None,
+    )
+    from autogen import AssistantAgent
+    agent = AssistantAgent(
+        name="llm_config_test",
+        system_message="test",
+        llm_config=cfg,
+    )
+    assert agent.name == "llm_config_test"

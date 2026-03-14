@@ -1,8 +1,6 @@
-"""GroupChat orchestration with AG2 native MCP client for tool access."""
+"""GroupChat orchestration with DuckDuckGo search (default) or MCP tools."""
 from autogen import GroupChat, GroupChatManager, LLMConfig, UserProxyAgent
-from autogen.mcp import create_toolkit
-from mcp import ClientSession
-from mcp.client.sse import sse_client
+from autogen.tools.experimental import DuckDuckGoSearchTool
 
 from agents import build_agents
 
@@ -12,23 +10,31 @@ async def run_research(topic: str, llm_config: LLMConfig, mcp_url: str | None = 
     executor = UserProxyAgent(
         name="executor",
         human_input_mode="NEVER",
-        code_execution_config=False,
+        code_execution_config=False,  # tools use register_for_execution, not code exec
         is_termination_msg=lambda m: "TERMINATE" in (m.get("content") or ""),
         default_auto_reply="",
     )
 
-    # Optionally connect to an MCP server (e.g. Fetch.ai's Brave/DuckDuckGo MCP)
     if mcp_url:
+        # Override: use MCP server tools (e.g. Fetch.ai's MCP gateway)
+        from autogen.mcp import create_toolkit
+        from mcp import ClientSession
+        from mcp.client.sse import sse_client
+
         async with (
             sse_client(mcp_url, timeout=60) as (read, write),
             ClientSession(read, write) as session,
         ):
             await session.initialize()
             toolkit = await create_toolkit(session=session)
-            toolkit.register_for_llm(agents[0])   # web_researcher gets the tools
-            toolkit.register_for_execution(agents[0])
+            toolkit.register_for_llm(agents[0])
+            toolkit.register_for_execution(executor)
             result = await _run_groupchat(agents, executor, llm_config, topic)
     else:
+        # Default: DuckDuckGo search — no API key required
+        search = DuckDuckGoSearchTool(num_results=5)
+        search.register_for_llm(agents[0])       # web_researcher can request searches
+        search.register_for_execution(executor)   # executor runs them
         result = await _run_groupchat(agents, executor, llm_config, topic)
 
     return result

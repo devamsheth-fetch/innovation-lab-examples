@@ -1,5 +1,7 @@
 # AG2 Research Synthesis Team
 
+![ag2](https://img.shields.io/badge/ag2-00ADD8) ![uagents](https://img.shields.io/badge/uagents-4A90E2) ![a2a](https://img.shields.io/badge/a2a-000000) ![innovationlab](https://img.shields.io/badge/innovationlab-3D8BD3)
+
 A multi-agent research pipeline using [AG2](https://github.com/ag2ai/ag2) (formerly AutoGen)
 integrated with the Fetch.ai uAgents ecosystem via the A2A protocol.
 
@@ -9,15 +11,17 @@ Four specialists collaborate under GroupChat with LLM-driven speaker selection, 
 an A2A executor and exposed as a discoverable agent on Agentverse.
 
 ```
+User / ASI:One / other uAgent
+         ↓
+SingleA2AAdapter (port 8008) → Agentverse
+         ↓
+AG2ResearchExecutor (A2A AgentExecutor)
+         ↓
 GroupChat (AG2)
-├── web_researcher   — searches and gathers information
-├── financial_analyst — analyses market and economic aspects
-├── tech_analyst     — evaluates technical feasibility
-└── synthesizer      — produces the final report
-         ↓
-SingleA2AAdapter (Fetch.ai uagents-adapter)
-         ↓
-Agentverse (discoverable at port 8008)
+├── web_researcher   — DuckDuckGo search, gathers sources
+├── financial_analyst — market data, metrics, trends
+├── tech_analyst     — technical feasibility, risks
+└── synthesizer      — final structured report
 ```
 
 ## Quick Start
@@ -28,8 +32,13 @@ cp .env.example .env  # add OPENAI_API_KEY and AGENTVERSE_API_KEY
 python main.py
 ```
 
+No additional API keys needed for search — DuckDuckGo is used by default.
+
+To use a Fetch.ai MCP gateway instead, set `MCP_SERVER_URL` in `.env`.
+
 ## AG2 Features Demonstrated
 
 - **`GroupChat` with `speaker_selection_method="auto"`** — LLM-driven dynamic speaker selection
-- **Native MCP client** — optional connection to Fetch.ai's MCP gateway for web search tools
-- **Pattern B (A2A Outbound)** — same integration pattern as LangChain and Google ADK examples
+- **`DuckDuckGoSearchTool`** — built-in web search, no API key required
+- **Native MCP client** — optional override via `MCP_SERVER_URL` for richer tool access
+- **`A2A AgentExecutor`** — same integration pattern used by other examples in this repo

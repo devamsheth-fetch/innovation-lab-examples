@@ -11,19 +11,19 @@ pauses before every response so the human can type "yes" to proceed or
 """
 import os
 from dotenv import load_dotenv
-from autogen import ConversableAgent
+from autogen import ConversableAgent, LLMConfig
 
 load_dotenv()
 
-llm_config = {
-    "config_list": [{
+llm_config = LLMConfig(
+    {
         "model": os.getenv("LLM_MODEL", "gpt-4o-mini"),
         "api_key": os.environ["OPENAI_API_KEY"],
         "base_url": os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
-    }],
-    "temperature": 0.2,
-    "cache_seed": None,
-}
+    },
+    temperature=0.2,
+    cache_seed=None,
+)
 
 researcher = ConversableAgent(
     name="researcher",
