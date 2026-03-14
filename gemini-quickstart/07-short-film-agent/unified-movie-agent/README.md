@@ -1,8 +1,6 @@
 # Unified Movie Agent
 
-**One agent, full pipeline.** Takes a single text prompt and produces a fully finished 8-scene cinematic short film — with AI-generated video, narration, music, opening titles, and closing credits. Replaces a 29-agent distributed system with a single process.
-
-Demoed live at the **Agentic Interop Summit at Google HQ**.
+**One agent, full pipeline.** Takes a single text prompt and produces a fully finished 8-scene cinematic short film — with AI-generated video, narration, music, opening titles, and closing credits.
 
 ---
 
@@ -130,6 +128,57 @@ python main_stripe.py   # with Stripe payments
 # or
 python main.py          # without payments (free)
 ```
+
+---
+
+## Running & Registering on Agentverse
+
+### Step 1: Start the Agent
+
+```bash
+python main_stripe.py
+```
+
+On startup you'll see:
+```
+🎬 Unified Movie Agent (Stripe-gated)
+📍 Address: agent1q...
+🎞️  8 scenes | 💳 Stripe payment: $5.00 USD
+...
+Agent inspector available at https://agentverse.ai/inspect/?uri=http%3A//127.0.0.1%3A8002&address=agent1q...
+```
+
+### Step 2: Register on Agentverse via Mailbox
+
+1. Open the **Agent Inspector link** from the terminal output in your browser
+2. This connects your locally running agent to Agentverse via a **mailbox** — so it can receive messages from the internet without exposing your local machine
+3. The inspector page will show your agent's address and protocols (AgentChatProtocol + AgentPaymentProtocol)
+4. Click **"Create Mailbox"** if prompted — this registers your agent on Agentverse
+
+### Step 3: Add an Agent README on Agentverse
+
+Once registered, go to your agent's page on [Agentverse](https://agentverse.ai) and add a description. This helps ASI:One and other users discover your agent. Example:
+
+> **AI Film Studio Agent**
+>
+> Send a text prompt and receive a fully produced 8-scene cinematic short film — with AI-generated video (Veo 3.1), voiceover narration (Gemini TTS), background music (Lyria), opening titles, and closing credits.
+>
+> Payment: $5.00 via Stripe embedded checkout.
+>
+> Example prompt: "A lonely lighthouse keeper on a frozen planet discovers that the northern lights are actually messages from a civilization that vanished a thousand years ago"
+>
+> Delivery time: ~90 seconds.
+
+### Step 4: Test the Agent
+
+You can interact with your agent in two ways:
+
+1. **By agent address** — paste the agent address (e.g. `agent1q...`) into the Agentverse chat or ASI:One
+2. **By agent handle** — if you set a handle on Agentverse (e.g. `@film-studio`), you can use that instead
+
+Send a film prompt → complete the Stripe checkout → receive your generated film.
+
+> **Tip:** Keep the terminal running — the agent must be alive locally for the mailbox to relay messages. If you stop the agent, messages will queue in the mailbox and be delivered when you restart.
 
 ---
 
