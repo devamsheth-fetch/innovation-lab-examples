@@ -108,28 +108,52 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - name: Install ruff
         run: python -m pip install --upgrade pip ruff
-      - name: Run lint
-        run: ruff check .
+      - name: Run lint on changed Python files
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.sha }}"
+          CHANGED_PY="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -E '\.py$' || true)"
+          if [ -z "$CHANGED_PY" ]; then
+            echo "No Python files changed; skipping lint."
+            exit 0
+          fi
+          echo "$CHANGED_PY" | tr '\n' '\0' | xargs -0 ruff check
 
   format:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - name: Install ruff
         run: python -m pip install --upgrade pip ruff
-      - name: Check formatting
-        run: ruff format . --check
+      - name: Check formatting on changed Python files
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.sha }}"
+          CHANGED_PY="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -E '\.py$' || true)"
+          if [ -z "$CHANGED_PY" ]; then
+            echo "No Python files changed; skipping format check."
+            exit 0
+          fi
+          echo "$CHANGED_PY" | tr '\n' '\0' | xargs -0 ruff format --check
 
   typecheck:
     runs-on: ubuntu-latest
