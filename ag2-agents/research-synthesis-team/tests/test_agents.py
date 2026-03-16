@@ -49,3 +49,35 @@ def test_llmconfig_positional_dict_construction():
         llm_config=cfg,
     )
     assert agent.name == "llm_config_test"
+
+
+def test_all_modules_import():
+    """Smoke test: every module imports without error."""
+    import agents
+    import agent_executor
+    import workflow
+    import main
+
+
+def test_duckduckgo_search_tool_instantiates():
+    """DuckDuckGoSearchTool must be constructable with no arguments."""
+    from autogen.tools.experimental import DuckDuckGoSearchTool
+    tool = DuckDuckGoSearchTool()
+    assert hasattr(tool, "register_for_llm")
+    assert hasattr(tool, "register_for_execution")
+
+
+def test_adapter_construction():
+    """SingleA2AAdapter accepts the params used in main.py."""
+    from unittest.mock import MagicMock
+    from uagents_adapter import SingleA2AAdapter
+    adapter = SingleA2AAdapter(
+        agent_executor=MagicMock(),
+        name="test",
+        description="test",
+        port=8008,
+        a2a_port=9999,
+        mailbox=True,
+        seed="test-seed",
+    )
+    assert adapter.name == "test"

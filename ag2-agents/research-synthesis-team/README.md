@@ -24,11 +24,15 @@ GroupChat (AG2)
 └── synthesizer      — final structured report
 ```
 
+## Prerequisites
+
+- **Python 3.10–3.13** (uagents depends on Pydantic v1, which is incompatible with Python 3.14+)
+
 ## Quick Start
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env  # add OPENAI_API_KEY and AGENTVERSE_API_KEY
+cp .env.example .env  # add OPENAI_API_KEY
 python main.py
 ```
 

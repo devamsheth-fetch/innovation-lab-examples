@@ -1,7 +1,22 @@
 """
-Fetch.ai uAgent exposing the AG2 research team via A2A protocol (Pattern B).
-Discoverable on Agentverse; callable from ASI:One or other uAgents.
+AG2 multi-agent research team, exposed via A2A protocol.
+
+On each request, four AG2 AssistantAgents are created in agents.py and
+orchestrated under GroupChat (workflow.py) with LLM-driven speaker selection
+to produce structured research reports. The result is served through
+SingleA2AAdapter, making the AG2 workflow discoverable on Agentverse and
+callable from ASI:One or other agents in the ecosystem.
+
+Requires Python ≤3.13 (uagents depends on Pydantic v1, incompatible with 3.14+).
 """
+import sys
+
+if sys.version_info >= (3, 14):
+    raise RuntimeError(
+        "uagents requires Python ≤3.13 (Pydantic v1 is incompatible with 3.14+). "
+        "Please use Python 3.10–3.13."
+    )
+
 import os
 from dotenv import load_dotenv
 from uagents_adapter import SingleA2AAdapter
@@ -35,8 +50,9 @@ adapter = SingleA2AAdapter(
         "collaborate to produce comprehensive research reports on any topic."
     ),
     port=int(os.getenv("AGENT_PORT", "8008")),
-    agentverse_url=os.getenv("AGENTVERSE_URL", "https://agentverse.ai"),
-    mailbox_api_key=os.getenv("AGENTVERSE_API_KEY", ""),
+    a2a_port=int(os.getenv("A2A_PORT", "9999")),
+    mailbox=True,
+    seed=os.getenv("AGENT_SEED"),
 )
 
 if __name__ == "__main__":

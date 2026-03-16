@@ -32,7 +32,7 @@ async def run_research(topic: str, llm_config: LLMConfig, mcp_url: str | None = 
             result = await _run_groupchat(agents, executor, llm_config, topic)
     else:
         # Default: DuckDuckGo search — no API key required
-        search = DuckDuckGoSearchTool(num_results=5)
+        search = DuckDuckGoSearchTool()
         search.register_for_llm(agents[0])       # web_researcher can request searches
         search.register_for_execution(executor)   # executor runs them
         result = await _run_groupchat(agents, executor, llm_config, topic)

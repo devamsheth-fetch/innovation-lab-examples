@@ -1,70 +1,57 @@
 """
-AG2 two-agent payment approval with human-in-the-loop gate.
+AG2 two-agent payment approval workflow, exposed via A2A protocol.
 
-researcher — investigates the recipient and produces a risk assessment
-executor   — presents the assessment and waits for explicit human confirmation
-             before executing the Skyfire payment
+On each request, two AG2 ConversableAgents (researcher → payment_executor)
+are created in agents.py and orchestrated by workflow.py to produce a risk
+assessment. The result is served through SingleA2AAdapter, making the AG2
+workflow discoverable on Agentverse and callable from ASI:One or other
+agents in the ecosystem.
 
-human_input_mode="ALWAYS" on executor is the approval gate: the agent
-pauses before every response so the human can type "yes" to proceed or
-"no" to abort. No custom routing logic required.
+Requires Python ≤3.13 (uagents depends on Pydantic v1, incompatible with 3.14+).
 """
+import sys
+
+if sys.version_info >= (3, 14):
+    raise RuntimeError(
+        "uagents requires Python ≤3.13 (Pydantic v1 is incompatible with 3.14+). "
+        "Please use Python 3.10–3.13."
+    )
+
 import os
 from dotenv import load_dotenv
-from autogen import ConversableAgent, LLMConfig
+from uagents_adapter import SingleA2AAdapter
+from autogen import LLMConfig
+
+from agent_executor import PaymentApprovalExecutor
 
 load_dotenv()
 
 llm_config = LLMConfig(
     {
         "model": os.getenv("LLM_MODEL", "gpt-4o-mini"),
-        "api_key": os.environ["OPENAI_API_KEY"],
+        "api_key": os.getenv("OPENAI_API_KEY", ""),
         "base_url": os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
     },
     temperature=0.2,
     cache_seed=None,
 )
 
-researcher = ConversableAgent(
-    name="researcher",
-    system_message=(
-        "You are a payment risk analyst. Investigate the payment recipient using available "
-        "tools: check their Fetch.ai address history, reputation, and any known flags. "
-        "Produce a concise risk assessment with a clear recommendation (proceed / do not proceed). "
-        "End your assessment with ASSESSMENT COMPLETE."
+executor = PaymentApprovalExecutor(llm_config=llm_config)
+
+adapter = SingleA2AAdapter(
+    agent_executor=executor,
+    name="AG2 Payment Approval Agent",
+    description=(
+        "Two-agent payment approval workflow using AG2 (formerly AutoGen). "
+        "A researcher investigates the recipient and a payment executor "
+        "produces a risk assessment with an APPROVED/REJECTED verdict. "
+        "Supports Fetch.ai payment protocol for commit/reject flows."
     ),
-    llm_config=llm_config,
-    # Conversation ends via max_turns or executor's TERMINATE check.
+    port=int(os.getenv("AGENT_PORT", "8009")),
+    a2a_port=int(os.getenv("A2A_PORT", "9998")),
+    mailbox=True,
+    seed=os.getenv("AGENT_SEED"),
 )
-
-executor = ConversableAgent(
-    name="payment_executor",
-    system_message=(
-        "You handle payment execution. Present the researcher's risk assessment clearly, "
-        "state the exact payment details (recipient, amount, reason), then ask the human "
-        "to confirm. If the human approves, call the skyfire_send tool to execute the payment. "
-        "If the human declines, acknowledge and terminate. End with TERMINATE."
-    ),
-    llm_config=llm_config,
-    human_input_mode="ALWAYS",  # pauses before every response — the human types yes/no
-    is_termination_msg=lambda m: "TERMINATE" in (m.get("content") or ""),
-)
-
-
-def run_payment_approval(recipient: str, amount: float, reason: str) -> None:
-    researcher.initiate_chat(
-        executor,
-        message=(
-            f"Payment request: {amount} USDC to {recipient} — reason: '{reason}'. "
-            f"Investigate the recipient and produce a risk assessment."
-        ),
-        max_turns=6,
-    )
-
 
 if __name__ == "__main__":
-    run_payment_approval(
-        recipient="alice.fetch",
-        amount=50.0,
-        reason="research report delivery",
-    )
+    adapter.run()
