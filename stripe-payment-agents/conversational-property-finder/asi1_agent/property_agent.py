@@ -9,6 +9,7 @@ import re
 from datetime import datetime, timezone
 from html import escape
 from uuid import uuid4
+from typing import Any
 
 from dotenv import load_dotenv
 from uagents import Agent, Context, Protocol
@@ -37,6 +38,9 @@ from property_finder.repliers_client.formatter import (
     format_listing_full,
 )
 
+from . import stripe_payments as stripe_payments_mod
+from .payment_proto import build_payment_proto
+
 # Ensure project root is on path so we can import property_finder.repliers_client
 import sys
 from pathlib import Path
@@ -46,13 +50,10 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 # ASI:One helper is kept for optional non-search chat features
-from .asi1_api import chat as asi1_chat
 try:
     import resend  # type: ignore[import]
 except ImportError:  # pragma: no cover - optional email export
     resend = None  # type: ignore[assignment]
-from . import stripe_payments as stripe_payments_mod
-from .payment_proto import build_payment_proto
 
 # Load .env from asi1_agent directory so it works when run from project root
 load_dotenv(_agent_dir / ".env")
@@ -83,7 +84,6 @@ chat_proto = Protocol(spec=chat_protocol_spec)
 
 # Keep last page of listings per session so the user can say
 # "the second one" and get more details.
-from typing import Any
 
 _LAST_RESULTS: dict[str, list[dict[str, Any]]] = {}
 # Simple in-memory wishlist per session (no persistence across restarts)
