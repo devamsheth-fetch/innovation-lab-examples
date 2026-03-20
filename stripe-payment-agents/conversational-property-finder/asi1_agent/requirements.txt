@@ -5,4 +5,4 @@ requests
 openai
 stripe
 resend
-black
+types-requests
