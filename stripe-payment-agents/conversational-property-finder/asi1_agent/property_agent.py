@@ -30,6 +30,13 @@ from .nl_parser import parse_filters
 from .llm_parser import llm_interpret
 from .state_manager import get_state, merge_parsed_into_state, next_page, update_state
 
+from property_finder.repliers_client.client import search_listings, fetch_listing_by_mls
+from property_finder.repliers_client.formatter import (
+    format_listings as format_listings_text,
+    format_listing_details,
+    format_listing_full,
+)
+
 # Ensure project root is on path so we can import property_finder.repliers_client
 import sys
 from pathlib import Path
@@ -37,12 +44,7 @@ _agent_dir = Path(__file__).resolve().parent
 _project_root = _agent_dir.parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
-from property_finder.repliers_client.client import search_listings, fetch_listing_by_mls
-from property_finder.repliers_client.formatter import (
-    format_listings as format_listings_text,
-    format_listing_details,
-    format_listing_full,
-)
+
 # ASI:One helper is kept for optional non-search chat features
 from .asi1_api import chat as asi1_chat
 try:
