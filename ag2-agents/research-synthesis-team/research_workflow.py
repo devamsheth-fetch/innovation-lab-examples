@@ -1,11 +1,14 @@
 """GroupChat orchestration with DuckDuckGo search (default) or MCP tools."""
+
 from autogen import GroupChat, GroupChatManager, LLMConfig, UserProxyAgent
 from autogen.tools.experimental import DuckDuckGoSearchTool
 
-from agents import build_agents
+from research_agents import build_agents
 
 
-async def run_research(topic: str, llm_config: LLMConfig, mcp_url: str | None = None) -> str:
+async def run_research(
+    topic: str, llm_config: LLMConfig, mcp_url: str | None = None
+) -> str:
     agents = build_agents(llm_config)
     executor = UserProxyAgent(
         name="executor",
@@ -33,8 +36,8 @@ async def run_research(topic: str, llm_config: LLMConfig, mcp_url: str | None = 
     else:
         # Default: DuckDuckGo search — no API key required
         search = DuckDuckGoSearchTool()
-        search.register_for_llm(agents[0])       # web_researcher can request searches
-        search.register_for_execution(executor)   # executor runs them
+        search.register_for_llm(agents[0])  # web_researcher can request searches
+        search.register_for_execution(executor)  # executor runs them
         result = await _run_groupchat(agents, executor, llm_config, topic)
 
     return result
@@ -52,5 +55,9 @@ async def _run_groupchat(agents, executor, llm_config, topic):
         manager,
         message=f"Research and synthesise a comprehensive report on: {topic}",
     )
-    reports = [m["content"] for m in gc.messages if m.get("name") == "synthesizer" and m.get("content")]
+    reports = [
+        m["content"]
+        for m in gc.messages
+        if m.get("name") == "synthesizer" and m.get("content")
+    ]
     return reports[-1] if reports else "Research did not complete."

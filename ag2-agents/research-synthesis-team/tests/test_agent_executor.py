@@ -1,9 +1,10 @@
 """Unit tests for AG2ResearchExecutor — no LLM calls, no network."""
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from autogen import LLMConfig
 
-from agent_executor import AG2ResearchExecutor
+from research_executor import AG2ResearchExecutor
 
 TEST_LLM = LLMConfig(
     {"model": "gpt-4o-mini", "api_key": "test", "base_url": "https://api.openai.com/v1"}
@@ -32,10 +33,18 @@ async def test_execute_calls_run_research():
     ctx, part_cls, text_part_cls = _make_context("quantum computing")
     event_queue = AsyncMock()
 
-    with patch("agent_executor.Part", part_cls), \
-         patch("agent_executor.TextPart", text_part_cls), \
-         patch("agent_executor.run_research", new_callable=AsyncMock, return_value="Mock report") as mock_run, \
-         patch("agent_executor.new_agent_text_message", return_value="event") as mock_msg:
+    with (
+        patch("research_executor.Part", part_cls),
+        patch("research_executor.TextPart", text_part_cls),
+        patch(
+            "research_executor.run_research",
+            new_callable=AsyncMock,
+            return_value="Mock report",
+        ) as mock_run,
+        patch(
+            "research_executor.new_agent_text_message", return_value="event"
+        ) as mock_msg,
+    ):
         await executor.execute(ctx, event_queue)
 
     mock_run.assert_called_once_with("quantum computing", TEST_LLM, None)
@@ -52,9 +61,13 @@ async def test_execute_empty_message():
     ctx.message = message
     event_queue = AsyncMock()
 
-    with patch("agent_executor.Part", MagicMock), \
-         patch("agent_executor.TextPart", MagicMock), \
-         patch("agent_executor.new_agent_text_message", return_value="err_event") as mock_msg:
+    with (
+        patch("research_executor.Part", MagicMock),
+        patch("research_executor.TextPart", MagicMock),
+        patch(
+            "research_executor.new_agent_text_message", return_value="err_event"
+        ) as mock_msg,
+    ):
         await executor.execute(ctx, event_queue)
 
     mock_msg.assert_called_once_with("Error: No message content received.")
@@ -68,10 +81,14 @@ async def test_execute_handles_research_error():
     event_queue = AsyncMock()
 
     failing_research = AsyncMock(side_effect=RuntimeError("LLM timeout"))
-    with patch("agent_executor.Part", part_cls), \
-         patch("agent_executor.TextPart", text_part_cls), \
-         patch("agent_executor.run_research", failing_research), \
-         patch("agent_executor.new_agent_text_message", return_value="err") as mock_msg:
+    with (
+        patch("research_executor.Part", part_cls),
+        patch("research_executor.TextPart", text_part_cls),
+        patch("research_executor.run_research", failing_research),
+        patch(
+            "research_executor.new_agent_text_message", return_value="err"
+        ) as mock_msg,
+    ):
         await executor.execute(ctx, event_queue)
 
     mock_msg.assert_called_once_with("Research failed: LLM timeout")
@@ -81,4 +98,5 @@ async def test_execute_handles_research_error():
 def test_executor_inherits_agent_executor():
     """AG2ResearchExecutor must inherit from the A2A AgentExecutor base class."""
     from a2a.server.agent_execution import AgentExecutor
+
     assert issubclass(AG2ResearchExecutor, AgentExecutor)

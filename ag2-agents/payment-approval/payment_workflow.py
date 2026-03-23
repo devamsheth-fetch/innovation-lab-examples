@@ -1,7 +1,8 @@
 """Async payment assessment workflow using AG2 two-agent chat."""
+
 from autogen import LLMConfig
 
-from agents import build_agents
+from payment_agents import build_agents
 
 
 async def run_payment_assessment(

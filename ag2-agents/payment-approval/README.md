@@ -33,7 +33,7 @@ Payment Protocol (via adapter)
 cd ag2-agents/payment-approval
 pip install -r requirements.txt
 cp .env.example .env  # add OPENAI_API_KEY
-python main.py
+python payment_main.py
 ```
 
 ## AG2 Features Demonstrated

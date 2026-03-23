@@ -2,13 +2,14 @@
 AG2 two-agent payment approval workflow, exposed via A2A protocol.
 
 On each request, two AG2 ConversableAgents (researcher → payment_executor)
-are created in agents.py and orchestrated by workflow.py to produce a risk
+are created in payment_agents.py and orchestrated by payment_workflow.py to produce a risk
 assessment. The result is served through SingleA2AAdapter, making the AG2
 workflow discoverable on Agentverse and callable from ASI:One or other
 agents in the ecosystem.
 
 Requires Python ≤3.13 (uagents depends on Pydantic v1, incompatible with 3.14+).
 """
+
 import sys
 
 if sys.version_info >= (3, 14):
@@ -22,7 +23,7 @@ from dotenv import load_dotenv
 from uagents_adapter import SingleA2AAdapter
 from autogen import LLMConfig
 
-from agent_executor import PaymentApprovalExecutor
+from payment_executor import PaymentApprovalExecutor
 
 load_dotenv()
 

@@ -33,7 +33,7 @@ GroupChat (AG2)
 ```bash
 pip install -r requirements.txt
 cp .env.example .env  # add OPENAI_API_KEY
-python main.py
+python research_main.py
 ```
 
 No additional API keys needed for search — DuckDuckGo is used by default.

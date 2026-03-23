@@ -2,6 +2,7 @@
 AG2 (formerly AutoGen) research synthesis team.
 Four specialists collaborate under GroupChat with LLM-driven speaker selection.
 """
+
 from autogen import AssistantAgent, LLMConfig
 
 

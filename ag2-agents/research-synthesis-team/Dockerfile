@@ -11,4 +11,4 @@ RUN apt-get update && apt-get install -y gcc \
 
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8008
-CMD ["python", "main.py"]
+CMD ["python", "research_main.py"]

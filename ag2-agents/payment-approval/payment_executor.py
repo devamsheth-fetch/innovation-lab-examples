@@ -2,6 +2,7 @@
 Wraps the AG2 payment assessment workflow as an A2A AgentExecutor
 for use with SingleA2AAdapter.
 """
+
 import re
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
@@ -11,7 +12,7 @@ from a2a.utils import new_agent_text_message
 from autogen import LLMConfig
 from typing_extensions import override
 
-from workflow import run_payment_assessment
+from payment_workflow import run_payment_assessment
 
 # Pattern: "50 USDC to alice.fetch — reason: 'research report delivery'"
 _PAYMENT_RE = re.compile(
@@ -46,6 +47,12 @@ class PaymentApprovalExecutor(AgentExecutor):
 
     @override
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+        if context.message is None:
+            await event_queue.enqueue_event(
+                new_agent_text_message("Error: No message content received.")
+            )
+            return
+
         message_content = ""
         for part in context.message.parts:
             if isinstance(part, Part):
@@ -60,7 +67,9 @@ class PaymentApprovalExecutor(AgentExecutor):
             return
 
         try:
-            recipient, amount, reason, currency = _parse_payment_request(message_content)
+            recipient, amount, reason, currency = _parse_payment_request(
+                message_content
+            )
             result = await run_payment_assessment(
                 recipient=recipient,
                 amount=amount,
