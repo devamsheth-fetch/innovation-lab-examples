@@ -1,105 +1,104 @@
-"""Gemini Imagen image generation client."""
+"""ASI1 One LLM API client."""
 
 from __future__ import annotations
 
 import asyncio
+import base64
 import os
-from io import BytesIO
 from typing import Any, Optional
 
-import aiohttp
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-IMAGEN_MODEL = os.getenv("GEMINI_IMAGEN_MODEL", "imagen-4.0-fast-generate-001")
+ASI_ONE_API_KEY = os.getenv("ASI_ONE_API_KEY")
+ASI_ONE_MODEL = os.getenv("ASI_ONE_MODEL", "asi1")
 TMPFILES_API_URL = "https://tmpfiles.org/api/v1/upload"
 
 
-async def upload_image_to_tmpfiles(image_data: bytes, content_type: str) -> Optional[str]:
+def upload_to_tmpfiles(image_bytes: bytes, filename: str = "asi1_image.png") -> str:
     """Upload image to tmpfiles.org and return the public download URL (https)."""
-    ext = "png" if "png" in content_type else "jpg"
-    for attempt in range(3):
-        try:
-            form = aiohttp.FormData()
-            form.add_field("file", image_data, filename=f"image.{ext}", content_type=content_type)
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    TMPFILES_API_URL, data=form, timeout=aiohttp.ClientTimeout(total=30)
-                ) as resp:
-                    if resp.status != 200:
-                        continue
-                    data = await resp.json()
-                    if data.get("status") == "success" and data.get("data"):
-                        url = (data["data"].get("url") or data.get("url") or "").strip()
-                        if url and url.startswith("http"):
-                            if url.startswith("http://"):
-                                url = "https://" + url[7:]
-                            if "tmpfiles.org/" in url and "/dl/" not in url:
-                                url = url.replace("https://tmpfiles.org/", "https://tmpfiles.org/dl/", 1)
-                            return url
-        except Exception:
-            if attempt < 2:
-                await asyncio.sleep(2 * (attempt + 1))
-    return None
+    try:
+        response = requests.post(
+            "https://tmpfiles.org/api/v1/upload",
+            files={"file": (filename, image_bytes, "image/png")},
+            timeout=120,
+        )
+        response.raise_for_status()
+        response_data = response.json()
+    except requests.RequestException as e:
+        raise RuntimeError(f"Tmpfiles upload failed: {e}") from e
+
+    raw_url = response_data.get("data", {}).get("url")
+    if not raw_url:
+        raise RuntimeError(f"Tmpfiles upload returned no URL: {response_data}")
+
+    # Convert page URL to direct download URL for easier image rendering in chat clients.
+    return raw_url.replace("http://tmpfiles.org/", "https://tmpfiles.org/dl/")
 
 
-def run_gemini_image_blocking(
+async def call_asi_one_api(
     *,
     prompt: str,
+    size: str = "auto",
 ) -> dict[str, Any] | None:
-    """Generate one image from a text prompt using Gemini Imagen."""
-    if not GEMINI_API_KEY:
-        return {"error": "GEMINI_API_KEY is not set", "status": "failed"}
+    """Call ASI1 One Image Generation API with a text prompt and upload image to tmpfiles.org.
+    Matches the logic from the ASI1 image generation example."""
+    if not ASI_ONE_API_KEY:
+        return {"error": "ASI_ONE_API_KEY is not set", "status": "failed"}
 
     try:
-        from google import genai
-        from google.genai import types
-    except ImportError:
-        return {"error": "google-genai not installed. pip install google-genai", "status": "failed"}
-
-    try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        response = client.models.generate_images(
-            model=IMAGEN_MODEL,
-            prompt=prompt.strip(),
-            config=types.GenerateImagesConfig(
-                number_of_images=1,
-                aspect_ratio="1:1",
-            ),
-        )
+        url = "https://api.asi1.ai/v1/image/generate"
+        payload = {
+            "model": ASI_ONE_MODEL,
+            "prompt": prompt.strip(),
+            "size": size,
+        }
+        headers = {
+            "Authorization": f"Bearer {ASI_ONE_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        
+        response = requests.post(url, json=payload, headers=headers, timeout=60)
+        if not response.ok:
+            return {
+                "error": f"{response.status_code} Error from ASI image API: {response.text}",
+                "status": "failed",
+            }
+        
+        response_data = response.json()
+        
+        # Follow the exact logic from the example
+        image_url = response_data.get("image_url") or response_data.get("url")
+        
+        if not image_url:
+            data_items = response_data.get("data", [])
+            if data_items and isinstance(data_items, list):
+                first_item = data_items[0] if data_items else {}
+                image_url = first_item.get("url")
+                if not image_url and first_item.get("b64_json"):
+                    # Decode base64 and upload to tmpfiles
+                    try:
+                        image_bytes = base64.b64decode(first_item["b64_json"])
+                        image_url = await asyncio.to_thread(upload_to_tmpfiles, image_bytes)
+                    except Exception as e:
+                        return {
+                            "error": f"Failed to process base64 image: {str(e)}",
+                            "status": "failed",
+                        }
+        
+        if not image_url:
+            return {
+                "error": f"ASI image API returned no image URL: {response_data}",
+                "status": "failed",
+            }
+        
+        return {
+            "image_url": image_url,
+            "status": "success",
+        }
+    except requests.RequestException as e:
+        return {"error": f"Image generation request failed: {str(e)}", "status": "failed"}
     except Exception as e:
         return {"error": str(e), "status": "failed"}
-
-    if not response.generated_images or len(response.generated_images) == 0:
-        return {"error": "No image generated", "status": "failed"}
-
-    gen = response.generated_images[0]
-    image_obj = getattr(gen, "image", None)
-    if image_obj is None:
-        return {"error": "Generated image has no image attribute", "status": "failed"}
-
-    image_data = None
-    content_type = "image/png"
-
-    img_bytes = getattr(image_obj, "image_bytes", None)
-    if img_bytes is not None:
-        image_data = img_bytes if isinstance(img_bytes, bytes) else bytes(img_bytes)
-    else:
-        try:
-            if hasattr(image_obj, "save"):
-                buf = BytesIO()
-                image_obj.save(buf, format="PNG")
-                image_data = buf.getvalue()
-        except Exception as e:
-            return {"error": f"Could not extract image bytes: {e}", "status": "failed"}
-
-    if not image_data:
-        return {"error": "Could not extract image bytes", "status": "failed"}
-
-    return {
-        "image_data": image_data,
-        "content_type": content_type,
-        "status": "success",
-    }

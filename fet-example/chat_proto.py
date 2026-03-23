@@ -9,7 +9,7 @@ from uagents_core.contrib.protocols.chat import (
 
 from payment import (
     request_payment_from_user,
-    generate_image_after_payment,
+    generate_response_after_payment,
 )
 from shared import create_text_chat
 
@@ -40,17 +40,18 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             if (ctx.storage.has(awaiting_key) or ctx.storage.get(awaiting_key)) and (
                 ctx.storage.has(verified_key) or ctx.storage.get(verified_key)
             ):
-                ctx.logger.info("Consuming prompt post-payment and generating one image")
+                ctx.logger.info("Consuming prompt post-payment and processing request")
                 ctx.storage.remove(awaiting_key)
                 ctx.storage.remove(verified_key)
                 ctx.storage.set(f"prompt:{sender}:{session_id}", text)
+                ctx.storage.set(f"current_prompt:{sender}:{session_id}", text)
                 ctx.storage.set("requesting_user", sender)
-                await generate_image_after_payment(ctx, sender)
+                await generate_response_after_payment(ctx, sender)
                 return
 
-            # Always request payment (no free images for anyone)
-            ctx.logger.info(f"Requesting payment from {sender} for image generation")
-            payment_description = "Please complete the payment to generate this image."
+            # Always request payment (no free requests for anyone)
+            ctx.logger.info(f"Requesting payment from {sender} for LLM processing")
+            payment_description = "Please complete the payment to process this request."
             # Persist prompt so we don't ask again after payment
             ctx.storage.set(f"prompt:{sender}:{session_id}", text)
             ctx.storage.set("current_prompt", text)

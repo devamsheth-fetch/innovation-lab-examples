@@ -1,4 +1,4 @@
-# agent.py - Gemini Imagen Image Generation Agent with Payment Protocol
+# agent.py - ASI1 One LLM Agent with Payment Protocol
 import os
 from dotenv import load_dotenv
 from uagents import Agent, Context
@@ -10,7 +10,7 @@ from payment import payment_proto, set_agent_wallet
 
 agent = Agent(
     name=os.getenv("AGENT_NAME", "Fet Example Agent"),
-    seed=os.getenv("AGENT_SEED_PHRASE", "gemini-imagen-agent"),
+    seed=os.getenv("AGENT_SEED_PHRASE", "asi1-llm-agent"),
     port=int(os.getenv("AGENT_PORT", "8000")),
     mailbox=True,
 )
@@ -23,10 +23,10 @@ set_agent_wallet(agent.wallet)
 @agent.on_event("startup")
 async def startup(ctx: Context):
     ctx.logger.info(f"Agent started: {agent.wallet.address()}")
-    ctx.logger.info("=== Gemini Imagen Image Generation Agent ===")
+    ctx.logger.info("=== ASI1 One LLM Agent ===")
     ctx.logger.info("💰 Accepted: 0.1 FET (direct)")
-    ctx.logger.info("🎨 Images via Gemini Imagen (GEMINI_API_KEY)")
-    ctx.logger.info("📧 Chat to request image generation")
+    ctx.logger.info("🤖 LLM via ASI1 One API (ASI_ONE_API_KEY)")
+    ctx.logger.info("📧 Chat to request LLM processing")
 
 
 if __name__ == "__main__":

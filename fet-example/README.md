@@ -4,8 +4,8 @@ A payment-ready agent that:
 
 - Requests payment via the uAgents payment protocol
 - Verifies and charges **0.1 FET** via direct FET on Dorado / Fetch network (seller flow)
-- After successful payment, generates an image via **Gemini Imagen**
-- Uploads to tmpfiles.org (HTTPS) and replies with a `ResourceContent` message (image URL)
+- After successful payment, generates an image via **ASI1 One LLM API**
+- Uploads to tmpfiles.org (HTTPS) and replies with markdown-formatted image in chat (image URL)
 
 ## Protocols
 
@@ -38,7 +38,7 @@ Rules (seller role):
 3. UI renders a FET payment card. User pays 0.1 FET on Dorado to the agent wallet.
 4. User sends `CommitPayment` with `transaction_id` and `metadata.buyer_fet_wallet`.
 5. Agent verifies the on-chain transfer via LedgerClient and sends `CompletePayment` on success.
-6. Agent calls Gemini Imagen with the stored prompt, uploads the image to tmpfiles.org (HTTPS), and replies with `ChatMessage` containing `TextContent` + `ResourceContent` (image URL).
+6. Agent calls ASI1 One LLM API image generation with the stored prompt, uploads base64 images to tmpfiles.org (HTTPS) if needed, and replies with `ChatMessage` containing markdown-formatted image `![Generated image]({image_url})`.
 
 ## Workflow (Mermaid)
 
@@ -58,10 +58,10 @@ flowchart TB
         H[payment_proto: handle_commit_payment]
         I[verify_fet_payment_to_agent]
         J[CompletePayment]
-        K[generate_image_after_payment]
-        L[run_gemini_image_blocking]
-        M[upload_image_to_tmpfiles]
-        N[Send ChatMessage with ResourceContent]
+        K[generate_response_after_payment]
+        L[call_asi_one_api]
+        M[upload_to_tmpfiles if base64]
+        N[Send ChatMessage with markdown image]
     end
 
     A --> F
@@ -86,7 +86,7 @@ sequenceDiagram
     participant C as Chat UI
     participant A as Agent
     participant L as Fetch Ledger
-    participant G as Gemini Imagen
+    participant G as ASI1 One LLM API
     participant T as tmpfiles.org
 
     U->>C: ChatMessage(prompt)
@@ -105,12 +105,14 @@ sequenceDiagram
 
     alt verified
         A->>C: CompletePayment
-        A->>G: generate_images(prompt)
-        G->>A: image bytes
-        A->>T: upload image
-        T->>A: HTTPS image URL
-        A->>C: ChatMessage(TextContent + ResourceContent(uri=URL))
-        C->>U: Show "Here is your generated image." + image
+        A->>G: generate_image(prompt)
+        G->>A: image URL or base64
+        alt base64 response
+            A->>T: upload base64 image
+            T->>A: HTTPS image URL
+        end
+        A->>C: ChatMessage(TextContent with markdown: ![image](URL))
+        C->>U: Show "Image generated successfully" + rendered image
     else not verified
         A->>C: CancelPayment(reason)
     end
@@ -123,12 +125,12 @@ Create a `.env` (you can add an `env.example` with the same keys and empty value
 ```env
 # Agent
 AGENT_NAME=Fet Example Agent
-AGENT_SEED_PHRASE=gemini-imagen-agent
+AGENT_SEED_PHRASE=asi1-llm-agent
 AGENT_PORT=8000
 
-# Gemini Imagen (required for image generation)
-GEMINI_API_KEY=
-GEMINI_IMAGEN_MODEL=imagen-4.0-fast-generate-001
+# ASI1 One LLM API (required for image generation)
+ASI_ONE_API_KEY=
+ASI_ONE_MODEL=asi1
 
 # Fetch network
 FET_USE_TESTNET=true
@@ -160,7 +162,7 @@ fet-example/
   agent.py          # Agent setup, loads env early, includes chat + payment protocols
   chat_proto.py     # Chat protocol and message handling (prompt → request payment / post-payment → generate)
   payment.py        # Seller-side payment (request, verify FET on-chain, charge flow)
-  client.py         # Gemini Imagen client + tmpfiles.org upload (HTTPS URLs)
+  client.py         # ASI1 One LLM API client + tmpfiles.org upload (handles URL and base64 responses)
   shared.py         # Shared helpers (e.g. create_text_chat)
   requirements.txt
   README.md
@@ -172,6 +174,8 @@ fet-example/
 - `accepted_funds` must include FET with `payment_method="fet_direct"`.
 - Always send `metadata.provider_agent_wallet` (and optionally `metadata.fet_network`) so the UI can show where to send FET.
 - Image URLs are forced to HTTPS (including tmpfiles.org) so HTTPS pages (e.g. staging.asi1.ai) do not hit mixed-content blocks.
+- ASI1 One LLM API returns either image URLs directly or base64-encoded images. The agent automatically handles both formats and uploads base64 images to tmpfiles.org.
+- Images are sent as markdown format `![Generated image]({image_url})` in TextContent, which renders properly in ASI1 Chat UI.
 - You can replace the payment method with another (e.g. Skyfire/USDC) by changing `payment_method`, verification logic, and metadata expected by the UI.
 
 ## Enabling FET payments on ASI1
