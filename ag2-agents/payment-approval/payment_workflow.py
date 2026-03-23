@@ -28,9 +28,10 @@ async def run_payment_assessment(
         max_turns=6,
     )
 
-    # Return the executor's final message (contains verdict)
+    # Return the executor's final verdict (filter by name to avoid
+    # returning a researcher message if max_turns is reached mid-turn)
     for msg in reversed(executor.chat_messages.get(researcher, [])):
-        if msg.get("content"):
+        if msg.get("name") == "payment_executor" and msg.get("content"):
             return msg["content"]
 
     return "Payment assessment did not complete."
