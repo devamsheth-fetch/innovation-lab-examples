@@ -92,7 +92,8 @@ _LAST_RESULTS: dict[str, list[dict[str, Any]]] = {}
 _WISHLISTS: dict[str, list[dict[str, Any]]] = {}
 # Track the last listing index the user explicitly referenced (e.g. via 'details 2')
 _LAST_SELECTED_INDEX: dict[str, int] = {}
-# Pending Stripe payments for "details": checkout_session_id -> {sender, session_id, listing_index}
+# Pending Stripe payments for "details": keyed by Stripe Checkout Session id (cs_...).
+# ASI1 embedded checkout passes that same id as CommitPayment.transaction_id; verify uses Session.retrieve(cs_).
 _PENDING_DETAILS_PAYMENTS: dict[str, dict[str, Any]] = {}
 # Also keep most recent pending payment per chat session so we can handle ASI1's
 # "<stripe:payment_id:...:CONFIRM>" chat messages (sender can change per message).
@@ -896,8 +897,11 @@ async def on_payment_commit(ctx: Context, sender: str, msg: CommitPayment):
         )
         return
     tid = msg.transaction_id
+    checkout_id = await asyncio.to_thread(
+        stripe_payments_mod.resolve_checkout_session_id, tid
+    )
     paid = await asyncio.to_thread(
-        stripe_payments_mod.verify_checkout_session_paid, tid
+        stripe_payments_mod.verify_checkout_session_paid, checkout_id
     )
     if not paid:
         await ctx.send(
@@ -908,7 +912,7 @@ async def on_payment_commit(ctx: Context, sender: str, msg: CommitPayment):
         )
         return
     await ctx.send(sender, CompletePayment(transaction_id=tid))
-    pending = _PENDING_DETAILS_PAYMENTS.pop(tid, None)
+    pending = _PENDING_DETAILS_PAYMENTS.pop(checkout_id, None)
     if not pending:
         await ctx.send(
             sender,

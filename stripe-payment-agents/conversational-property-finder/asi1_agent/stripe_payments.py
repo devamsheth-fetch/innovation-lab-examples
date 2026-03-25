@@ -126,6 +126,30 @@ def create_embedded_checkout_session(
         return None
 
 
+def resolve_checkout_session_id(transaction_ref: str) -> str:
+    """
+    Embedded Checkout is keyed by Session id (``cs_...``). ASI1 / Agentverse normally
+    echoes that same id as ``CommitPayment.transaction_id``. If a client ever sends a
+    PaymentIntent id (``pi_...``), map it to the Checkout Session so verification and
+    in-memory pending lookups (keyed by ``cs_``) stay aligned.
+    """
+    ref = (transaction_ref or "").strip()
+    if not ref or not is_configured() or ref.startswith("cs_"):
+        return ref
+    if not ref.startswith("pi_"):
+        return ref
+    s = _get_stripe()
+    if not s:
+        return ref
+    try:
+        sessions = s.checkout.Session.list(payment_intent=ref, limit=1)
+        if sessions.data:
+            return sessions.data[0].id
+    except Exception:
+        pass
+    return ref
+
+
 def verify_checkout_session_paid(checkout_session_id: str) -> bool:
     if not is_configured():
         return False
