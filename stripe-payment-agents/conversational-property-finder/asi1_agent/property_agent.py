@@ -178,12 +178,36 @@ def _parse_create_sheet_fallback(text: str) -> dict | None:
     return None
 
 
+# Pagination-only continuations after "more" (must not match real searches like
+# "more spacious apartments in austin", which should go through the LLM).
+_MORE_PAGINATION_TAIL = re.compile(
+    r"^more\s+("
+    r"please"
+    r"|results?"
+    r"|listings?"
+    r"|options?"
+    r"|properties?"
+    r"|homes?"
+    r"|houses?"
+    r"|places?"
+    r"|units?"
+    r")(\s+please)?$"
+)
+
+
 def _is_more_request(text: str) -> bool:
     t = _normalize_text(text)
     if t in ("more", "more listings", "next", "next page"):
         return True
-    # Treat simple variants like "more options", "more places", "more apartments in austin" as 'more'
-    if t.startswith("more "):
+    if t in (
+        "more please",
+        "show more",
+        "see more",
+        "any more",
+        "give me more",
+    ):
+        return True
+    if _MORE_PAGINATION_TAIL.match(t):
         return True
     return False
 
@@ -493,9 +517,10 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
             return
         # Deliver details
         _PENDING_DETAILS_BY_SESSION.pop(session_id, None)
+        _LAST_SELECTED_INDEX[session_id] = int(idx)
         listing = listings[int(idx) - 1]
         mls = listing.get("mls")
-        raw = fetch_listing_by_mls(mls) if mls else None
+        raw = await asyncio.to_thread(fetch_listing_by_mls, mls) if mls else None
         card = (
             format_listing_full(listing, raw, int(idx))
             if raw
@@ -615,7 +640,9 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
                         "Either add your email to the message (e.g. `export wishlist to you@example.com`) "
                     )
                 else:
-                    sent = _send_wishlist_email(saved, to_email)
+                    sent = await asyncio.to_thread(
+                        _send_wishlist_email, saved, to_email
+                    )
                     if sent:
                         reply_text = (
                             f"I've emailed your wishlist to {to_email}.\n\n"
@@ -762,6 +789,8 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
                         metadata={"stripe": checkout, "service": "listing_details"},
                     )
                     await ctx.send(sender, req)
+                    # Same as free details: remember listing for "add this to my wishlist"
+                    _LAST_SELECTED_INDEX[session_id] = int(idx)
                     reply_text = (
                         f"Pay ${amount_str} to unlock full details for listing #{idx}. "
                         "Complete the checkout above, then I'll send the full listing details here."
@@ -771,7 +800,7 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
             listing = listings[int(idx) - 1]
             _LAST_SELECTED_INDEX[session_id] = int(idx)
             mls = listing.get("mls")
-            raw = fetch_listing_by_mls(mls) if mls else None
+            raw = await asyncio.to_thread(fetch_listing_by_mls, mls) if mls else None
             if raw:
                 card = format_listing_full(listing, raw, int(idx))
             else:
@@ -929,8 +958,9 @@ async def on_payment_commit(ctx: Context, sender: str, msg: CommitPayment):
         )
         return
     listing = listings[idx - 1]
+    _LAST_SELECTED_INDEX[paid_session_id] = idx
     mls = listing.get("mls")
-    raw = fetch_listing_by_mls(mls) if mls else None
+    raw = await asyncio.to_thread(fetch_listing_by_mls, mls) if mls else None
     if raw:
         card = format_listing_full(listing, raw, idx)
     else:
