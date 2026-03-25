@@ -3,13 +3,14 @@ Call ASI:One chat completions API to delegate actions (e.g. create Google Sheet)
 so we can use the platform's built-in capabilities when the user asks our agent.
 Requires ASI1_API_KEY or ASI_ONE_API_KEY in .env.
 """
+
 from __future__ import annotations
 
 import os
 import re
 
 try:
-    import requests
+    import requests  # type: ignore[import-untyped]
 except ImportError:
     requests = None
 

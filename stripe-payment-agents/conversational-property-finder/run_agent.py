@@ -6,6 +6,7 @@ Usage (from this directory):
 Or from project root (Property Finder):
   python3 property_finder/run_agent.py
 """
+
 import sys
 from pathlib import Path
 
@@ -16,5 +17,6 @@ if str(_root) not in sys.path:
 
 if __name__ == "__main__":
     from property_finder.asi1_agent.property_agent import agent
+
     print("Property Finder agent address:", agent.address)
     agent.run()

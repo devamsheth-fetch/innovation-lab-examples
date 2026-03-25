@@ -1,6 +1,7 @@
 """
 Agent Payment Protocol (seller): request payment, handle CommitPayment / RejectPayment.
 """
+
 from __future__ import annotations
 
 from typing import Awaitable, Callable

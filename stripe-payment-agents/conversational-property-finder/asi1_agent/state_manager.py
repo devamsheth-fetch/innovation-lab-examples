@@ -2,6 +2,7 @@
 Conversation state manager: in-memory session filters keyed by session ID.
 No database. Handles: new search, refinements (under 550k, 3 bedrooms, only condos), "more" -> page += 1.
 """
+
 from typing import Any
 
 # Session ID -> filter state (location, max_price, bedrooms, property_type, deal_type, page)
@@ -92,7 +93,9 @@ def update_state(
     return new_state
 
 
-def merge_parsed_into_state(session_id: str, parsed: dict[str, Any], is_refinement: bool) -> dict[str, Any]:
+def merge_parsed_into_state(
+    session_id: str, parsed: dict[str, Any], is_refinement: bool
+) -> dict[str, Any]:
     """
     Merge parsed filters into session state.
     - If is_refinement: only update fields that are present in parsed (non-None).

@@ -6,6 +6,7 @@ All notable changes to this repository are documented in this file.
 
 ### Added
 
+- `stripe-payment-agents/conversational-property-finder`: ASI1 conversational property search agent (Repliers MLS, optional Stripe details paywall, OpenAI/regex parsing)
 - `CONTRIBUTING.md` with agent-focused contribution workflow and merge policy
 - Pull request CI workflow with checks for `stargazer-gate`, `lint`, `format`, `typecheck`, `validate-architecture`, and `test`
 - `.github/CODEOWNERS` for required reviewer routing

@@ -1,6 +1,7 @@
 """
 Format listing objects into readable ASI1 chat text.
 """
+
 from typing import Any
 
 
@@ -102,7 +103,9 @@ def format_listing(index: int, listing: dict[str, Any]) -> str:
         photo_lines = [f"   Photo {i + 1}: {url}" for i, url in enumerate(show)]
         image_line = "\n" + "\n".join(photo_lines)
         if len(images) > 3:
-            image_line += f"\n   (+{len(images) - 3} more — say \"details {index}\" for all)"
+            image_line += (
+                f'\n   (+{len(images) - 3} more — say "details {index}" for all)'
+            )
     elif image_url:
         image_line = f"\n   Photo: {image_url}"
 
@@ -185,9 +188,17 @@ def _format_extra_details(raw: dict[str, Any]) -> str:
     if list_date:
         lifecycle_lines.append(f"Listed on: {list_date}")
     if original_price:
-        lifecycle_lines.append(f"Original price: ${original_price:,}" if isinstance(original_price, (int, float)) else f"Original price: {original_price}")
+        lifecycle_lines.append(
+            f"Original price: ${original_price:,}"
+            if isinstance(original_price, (int, float))
+            else f"Original price: {original_price}"
+        )
     if sold_price:
-        sold_str = f"${sold_price:,}" if isinstance(sold_price, (int, float)) else str(sold_price)
+        sold_str = (
+            f"${sold_price:,}"
+            if isinstance(sold_price, (int, float))
+            else str(sold_price)
+        )
         lifecycle_lines.append(f"Sold price: {sold_str}")
     if sold_date:
         lifecycle_lines.append(f"Sold date: {sold_date}")
@@ -404,13 +415,13 @@ def format_listings(
     text += "\n\n"
     text += (
         "Reply with:\n"
-        "- \"more\" to see more listings\n"
-        "- \"refine under $X\" or \"under $X\" to change max price\n"
-        "- \"X bedrooms\" or \"change to X bedrooms\" to change beds\n"
-        "- \"only condos\" (or \"condos only\") to filter by property type\n"
-        "- \"details N\" (e.g. \"details 2\") to see full details and photos for a result\n"
-        "- \"save N to my wishlist\" (e.g. \"save 1 to my wishlist\" or \"add the second one to favorites\") to save a result\n"
-        "- \"show my wishlist\" to see everything you've saved in this chat"
+        '- "more" to see more listings\n'
+        '- "refine under $X" or "under $X" to change max price\n'
+        '- "X bedrooms" or "change to X bedrooms" to change beds\n'
+        '- "only condos" (or "condos only") to filter by property type\n'
+        '- "details N" (e.g. "details 2") to see full details and photos for a result\n'
+        '- "save N to my wishlist" (e.g. "save 1 to my wishlist" or "add the second one to favorites") to save a result\n'
+        '- "show my wishlist" to see everything you\'ve saved in this chat'
     )
     if has_more:
         text += "\n(There are more results on the next page.)"

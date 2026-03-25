@@ -7,6 +7,7 @@ If OPENAI_API_KEY is set, we use OpenAI to extract:
 
 This is optional: if anything fails we fall back to the regex parser.
 """
+
 from __future__ import annotations
 
 import json
@@ -30,7 +31,9 @@ def _get_client() -> Optional[OpenAI]:
     return _client
 
 
-def llm_interpret(user_text: str, current_state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def llm_interpret(
+    user_text: str, current_state: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
     """
     Use OpenAI to interpret the user message into intent + structured filters.
 
@@ -90,7 +93,7 @@ def llm_interpret(user_text: str, current_state: Dict[str, Any]) -> Optional[Dic
         "- deal_type should be 'rent' when the user clearly wants rentals "
         "(e.g. 'for rent', 'rental', 'lease') and 'buy' when they clearly want "
         "to purchase (e.g. 'to buy', 'for sale'). If unclear, leave it null.\n"
-        "- min_baths should reflect \"2+ baths\" requests, min_sqft for "
+        '- min_baths should reflect "2+ baths" requests, min_sqft for '
         "minimum square footage (e.g. 'over 1000 sqft'), and min_year_built "
         "for constraints like 'built after 2010'. If not mentioned, leave them null.\n"
     )
@@ -148,4 +151,3 @@ def llm_interpret(user_text: str, current_state: Dict[str, Any]) -> Optional[Dic
     except Exception:
         # On any error, fall back to regex path
         return None
-

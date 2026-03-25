@@ -2,6 +2,7 @@
 Natural language parser: extract structured filters from user text.
 Uses regex for price, bedrooms, location; optional property type.
 """
+
 import re
 from typing import Any
 
@@ -9,11 +10,11 @@ from typing import Any
 # Patterns
 # Use more permissive digit patterns so we handle plain numbers like 300000 (no commas).
 PRICE_PATTERNS = [
-    r"\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*k\b",     # 600k, $600k
-    r"under\s+\$?\s*(\d[\d,]*)",                      # under $600000 or under 600,000
-    r"\$?\s*(\d[\d,]*)\s*and\s+under",                # 600000 and under
-    r"max\s*(?:price)?\s*\$?\s*(\d[\d,.]*)",          # max price 600000
-    r"under\s+(\d+)\s*k",                             # under 600k
+    r"\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*k\b",  # 600k, $600k
+    r"under\s+\$?\s*(\d[\d,]*)",  # under $600000 or under 600,000
+    r"\$?\s*(\d[\d,]*)\s*and\s+under",  # 600000 and under
+    r"max\s*(?:price)?\s*\$?\s*(\d[\d,.]*)",  # max price 600000
+    r"under\s+(\d+)\s*k",  # under 600k
 ]
 BEDROOM_PATTERNS = [
     r"(\d+)\s*bed(?:room)?s?",
@@ -144,7 +145,10 @@ def _parse_deal_type(text: str) -> str | None:
     Return 'rent' or 'buy' if the text clearly indicates rental vs purchase.
     """
     lower = text.lower()
-    if any(w in lower for w in ["for rent", "to rent", "rental", "renting", "lease", "for lease"]):
+    if any(
+        w in lower
+        for w in ["for rent", "to rent", "rental", "renting", "lease", "for lease"]
+    ):
         return "rent"
     if any(w in lower for w in ["for sale", "to buy", "buying", "purchase", "own"]):
         return "buy"
@@ -157,7 +161,11 @@ def _parse_near_landmark(text: str) -> str | None:
     For now, handle UT Austin as a special case.
     """
     lower = text.lower()
-    if "ut austin" in lower or "university of texas at austin" in lower or "university of texas austin" in lower:
+    if (
+        "ut austin" in lower
+        or "university of texas at austin" in lower
+        or "university of texas austin" in lower
+    ):
         if "near" in lower or "close to" in lower or "by" in lower:
             return "ut_austin"
     return None
@@ -165,14 +173,34 @@ def _parse_near_landmark(text: str) -> str | None:
 
 # Words that are not location names (avoid "bedroom homes", "2 bed", etc.)
 _LOCATION_STOP_WORDS = {
-    "bedroom", "bedrooms", "beds", "bed", "bath", "baths", "bathroom", "bathrooms",
-    "home", "homes", "house", "houses", "under", "only", "condo", "condos",
-    "refine", "change", "more", "listings", "properties", "property",
+    "bedroom",
+    "bedrooms",
+    "beds",
+    "bed",
+    "bath",
+    "baths",
+    "bathroom",
+    "bathrooms",
+    "home",
+    "homes",
+    "house",
+    "houses",
+    "under",
+    "only",
+    "condo",
+    "condos",
+    "refine",
+    "change",
+    "more",
+    "listings",
+    "properties",
+    "property",
 }
 
 
 def _parse_location(text: str) -> str | None:
     """Extract city/area name (e.g. Austin)."""
+
     def _is_plausible_location(loc: str) -> bool:
         if not loc or len(loc) > 80 or re.match(r"^\d+$", loc):
             return False
@@ -188,7 +216,9 @@ def _parse_location(text: str) -> str | None:
             if _is_plausible_location(loc):
                 return loc
     # Fallback: look for "in <place>" and take the last/best match (often the city)
-    for m in re.finditer(r"\bin\s+([A-Za-z][A-Za-z\s]{1,50}?)(?=\s+under|\s*\.|,|\s+\d+\s*k|\s*$)", text):
+    for m in re.finditer(
+        r"\bin\s+([A-Za-z][A-Za-z\s]{1,50}?)(?=\s+under|\s*\.|,|\s+\d+\s*k|\s*$)", text
+    ):
         loc = m.group(1).strip()
         if _is_plausible_location(loc):
             return loc

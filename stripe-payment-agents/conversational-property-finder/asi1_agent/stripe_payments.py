@@ -5,6 +5,7 @@ full listing details. Requires STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY in .
 Important: this module reads env vars dynamically at runtime (not at import time),
 because the agent loads dotenv after imports.
 """
+
 from __future__ import annotations
 
 import os
@@ -15,6 +16,7 @@ try:
 except ImportError:
     stripe = None
 
+
 def _cfg() -> dict:
     secret_key = (os.getenv("STRIPE_SECRET_KEY", "") or "").strip()
     publishable_key = (os.getenv("STRIPE_PUBLISHABLE_KEY", "") or "").strip()
@@ -23,8 +25,13 @@ def _cfg() -> dict:
     except Exception:
         amount_cents = 50
     currency = (os.getenv("STRIPE_CURRENCY", "usd") or "usd").lower().strip() or "usd"
-    product_name = (os.getenv("STRIPE_PRODUCT_NAME", "Listing details") or "Listing details").strip()
-    success_url = (os.getenv("STRIPE_SUCCESS_URL", "https://agentverse.ai") or "https://agentverse.ai").rstrip("/")
+    product_name = (
+        os.getenv("STRIPE_PRODUCT_NAME", "Listing details") or "Listing details"
+    ).strip()
+    success_url = (
+        os.getenv("STRIPE_SUCCESS_URL", "https://agentverse.ai")
+        or "https://agentverse.ai"
+    ).rstrip("/")
     return {
         "secret_key": secret_key,
         "publishable_key": publishable_key,

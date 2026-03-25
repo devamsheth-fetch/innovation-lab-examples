@@ -1,10 +1,11 @@
 """
 Repliers MLS API client: search_listings(filters) -> list of simplified listing objects.
 """
+
 import os
 from typing import Any
 
-import requests
+import requests  # type: ignore[import-untyped]
 
 from .filters import build_query_params
 from .formatter import format_listings  # noqa: F401 — re-export if needed
@@ -56,10 +57,7 @@ def _simplify_listing(raw: dict[str, Any]) -> dict[str, Any]:
             or details.get("approxSquareFootage")
         )
         year_built = details.get("yearBuilt") or details.get("yearBuiltDetails")
-        property_type = (
-            details.get("type")
-            or details.get("propertyType")
-        )
+        property_type = details.get("type") or details.get("propertyType")
         days_on_market = details.get("daysOnMarket") or details.get("dom")
     else:
         beds = raw.get("numBedrooms") or raw.get("beds")
@@ -73,9 +71,7 @@ def _simplify_listing(raw: dict[str, Any]) -> dict[str, Any]:
 
     # Description / remarks
     description = (
-        raw.get("remarks")
-        or raw.get("publicRemarks")
-        or raw.get("description")
+        raw.get("remarks") or raw.get("publicRemarks") or raw.get("description")
     )
     if isinstance(description, str):
         description = description.strip()
@@ -109,8 +105,17 @@ def _simplify_listing(raw: dict[str, Any]) -> dict[str, Any]:
                 break
 
     # Coordinates (if available) for potential distance calculations
-    lat = raw.get("lat") or raw.get("latitude") or (address_obj.get("lat") if isinstance(address_obj, dict) else None)
-    lon = raw.get("long") or raw.get("lng") or raw.get("lon") or (address_obj.get("long") if isinstance(address_obj, dict) else None)
+    lat = (
+        raw.get("lat")
+        or raw.get("latitude")
+        or (address_obj.get("lat") if isinstance(address_obj, dict) else None)
+    )
+    lon = (
+        raw.get("long")
+        or raw.get("lng")
+        or raw.get("lon")
+        or (address_obj.get("long") if isinstance(address_obj, dict) else None)
+    )
 
     return {
         "address": address or "—",

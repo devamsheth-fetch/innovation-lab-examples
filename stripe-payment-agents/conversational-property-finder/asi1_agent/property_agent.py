@@ -3,6 +3,7 @@ ASI1 Property Finder agent: receives ChatMessage, parses intent, updates state,
 calls Repliers, formats response, sends ChatMessage reply.
 Optional: Payment Protocol (Stripe) to charge a small amount for full listing details.
 """
+
 import asyncio
 import os
 import re
@@ -44,6 +45,7 @@ from .payment_proto import build_payment_proto
 # Ensure project root is on path so we can import property_finder.repliers_client
 import sys
 from pathlib import Path
+
 _agent_dir = Path(__file__).resolve().parent
 _project_root = _agent_dir.parent.parent
 if str(_project_root) not in sys.path:
@@ -145,7 +147,7 @@ def _send_wishlist_email(listings: list[dict[str, Any]], to_email: str) -> bool:
 
 def _get_user_text(msg: ChatMessage) -> str | None:
     """Extract user text from ChatMessage content (TextContent)."""
-    for item in (msg.content or []):
+    for item in msg.content or []:
         if hasattr(item, "text"):
             return getattr(item, "text", None) or None
     return None
@@ -192,7 +194,16 @@ def _is_refinement_only(text: str) -> bool:
     if not t:
         return False
     # Refinement-like: short, no "find" / "search" / "looking for"
-    refinement_starters = ("refine", "under", "only", "change to", "make it", "filter", "just", "max ")
+    refinement_starters = (
+        "refine",
+        "under",
+        "only",
+        "change to",
+        "make it",
+        "filter",
+        "just",
+        "max ",
+    )
     if any(t.startswith(p) or p in t for p in refinement_starters):
         return True
     if t.isdigit() or re.match(r"^\d+\s*bed", t):
@@ -220,7 +231,12 @@ def _parse_wishlist_command(text: str) -> tuple[str, int | None] | None:
         .replace("wihslist", "wishlist")
         .replace("wishlst", "wishlist")
     )
-    if "wishlist" not in t and "favorite" not in t and "favourite" not in t and "saved" not in t:
+    if (
+        "wishlist" not in t
+        and "favorite" not in t
+        and "favourite" not in t
+        and "saved" not in t
+    ):
         return None
 
     # If the user mentions both "export" and "wishlist" in any order,
@@ -229,7 +245,10 @@ def _parse_wishlist_command(text: str) -> tuple[str, int | None] | None:
         return ("wishlist_export", None)
 
     # Clear wishlist
-    if any(word in t for word in ("clear wishlist", "empty wishlist", "reset wishlist", "remove all")):
+    if any(
+        word in t
+        for word in ("clear wishlist", "empty wishlist", "reset wishlist", "remove all")
+    ):
         return ("wishlist_clear", None)
 
     # Export wishlist to a Google Sheet
@@ -329,7 +348,9 @@ def _search_summary(state: dict) -> str:
     return " ".join(parts) or "Property search"
 
 
-async def _handle_search(ctx: Context, sender: str, session_id: str, state: dict) -> str:
+async def _handle_search(
+    ctx: Context, sender: str, session_id: str, state: dict
+) -> str:
     """Call Repliers, format listings, optionally export to Google Sheet, return reply text."""
     try:
         listings, meta = search_listings(state, export_page_size=None)
@@ -340,10 +361,10 @@ async def _handle_search(ctx: Context, sender: str, session_id: str, state: dict
             return (
                 "No more listings on the next page for your current filters.\n\n"
                 "Try:\n"
-                "- \"more\" (after broadening filters)\n"
-                "- \"under $X\" (higher)\n"
-                "- \"2 bedrooms\" (or fewer)\n"
-                "- \"only condos\""
+                '- "more" (after broadening filters)\n'
+                '- "under $X" (higher)\n'
+                '- "2 bedrooms" (or fewer)\n'
+                '- "only condos"'
             )
         # Save results for follow-up "details" questions, but only if we actually got some
         if listings:
@@ -393,7 +414,11 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
             # If the message model only has (content, msg_id, timestamp), ASI1 is not giving us a stable chat id.
             # In that case, use a single rolling session key so "more"/refine works in a live demo even if sender changes.
             global _WARNED_NO_CHAT_ID
-            if isinstance(dump, dict) and sorted(list(dump.keys())) == ["content", "msg_id", "timestamp"]:
+            if isinstance(dump, dict) and sorted(list(dump.keys())) == [
+                "content",
+                "msg_id",
+                "timestamp",
+            ]:
                 session_id = _FALLBACK_SESSION_KEY
                 if not _WARNED_NO_CHAT_ID:
                     _WARNED_NO_CHAT_ID = True
@@ -414,10 +439,15 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
         session_id = str(sender)
     user_text = _get_user_text(msg)
     # ASI1 messages often start with an @agent... mention; strip it so intent detection works
-    user_text = _strip_agent_mention(user_text)
+    user_text = _strip_agent_mention(user_text or "")
     if not user_text:
         reply = ChatMessage(
-            content=[TextContent(type="text", text="Send me a property search, e.g. \"Find 2 bedroom homes under $600k in Austin.\"")],
+            content=[
+                TextContent(
+                    type="text",
+                    text='Send me a property search, e.g. "Find 2 bedroom homes under $600k in Austin."',
+                )
+            ],
             msg_id=uuid4(),
             timestamp=datetime.now(timezone.utc),
         )
@@ -427,7 +457,11 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
     # ASI1 Stripe embedded checkout can send a chat confirmation message like:
     # "<stripe:payment_id:UUID:CONFIRM>". This is not a user search message.
     # Handle it by verifying the most recent pending checkout for this chat session.
-    if isinstance(user_text, str) and user_text.strip().startswith("<stripe:payment_id:") and user_text.strip().endswith(":CONFIRM>"):
+    if (
+        isinstance(user_text, str)
+        and user_text.strip().startswith("<stripe:payment_id:")
+        and user_text.strip().endswith(":CONFIRM>")
+    ):
         pending = _PENDING_DETAILS_BY_SESSION.get(session_id)
         if not pending:
             # Nothing pending; ignore quietly
@@ -438,13 +472,20 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
         if not checkout_session_id or not idx or not (1 <= int(idx) <= len(listings)):
             _PENDING_DETAILS_BY_SESSION.pop(session_id, None)
             return
-        paid = await asyncio.to_thread(stripe_payments_mod.verify_checkout_session_paid, checkout_session_id)
+        paid = await asyncio.to_thread(
+            stripe_payments_mod.verify_checkout_session_paid, checkout_session_id
+        )
         if not paid:
             # Payment may still be processing; don't clear pending yet.
             await ctx.send(
                 sender,
                 ChatMessage(
-                    content=[TextContent(type="text", text="Payment received signal detected, but Stripe still shows it as unpaid. Please wait a moment and try again.")],
+                    content=[
+                        TextContent(
+                            type="text",
+                            text="Payment received signal detected, but Stripe still shows it as unpaid. Please wait a moment and try again.",
+                        )
+                    ],
                     msg_id=uuid4(),
                     timestamp=datetime.now(timezone.utc),
                 ),
@@ -455,7 +496,11 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
         listing = listings[int(idx) - 1]
         mls = listing.get("mls")
         raw = fetch_listing_by_mls(mls) if mls else None
-        card = format_listing_full(listing, raw, int(idx)) if raw else format_listing_details(listing, int(idx))
+        card = (
+            format_listing_full(listing, raw, int(idx))
+            if raw
+            else format_listing_details(listing, int(idx))
+        )
         reply_text = f"Here are the full details for listing #{idx}:\n\n{card}"
         await ctx.send(
             sender,
@@ -489,7 +534,17 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
             session_id,
             has_state,
             user_text,
-            {k: current_state.get(k) for k in ("location", "deal_type", "bedrooms", "max_price", "property_type", "page")},
+            {
+                k: current_state.get(k)
+                for k in (
+                    "location",
+                    "deal_type",
+                    "bedrooms",
+                    "max_price",
+                    "property_type",
+                    "page",
+                )
+            },
         )
     except Exception:
         pass
@@ -501,47 +556,55 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
         if action == "wishlist_add":
             # If no explicit index was provided (e.g. "add this to my wishlist"),
             # fall back to the last listing the user referenced (via 'details N').
-            if (idx is None or not isinstance(idx, int)) and session_id in _LAST_SELECTED_INDEX:
+            if (
+                idx is None or not isinstance(idx, int)
+            ) and session_id in _LAST_SELECTED_INDEX:
                 idx = _LAST_SELECTED_INDEX.get(session_id)
 
             if not listings:
                 reply_text = (
                     "Do a property search first, then say something like "
-                    "\"save 2 to my wishlist\" or \"add the first one to my favorites.\""
+                    '"save 2 to my wishlist" or "add the first one to my favorites."'
                 )
             elif not idx or not (1 <= int(idx) <= len(listings)):
                 reply_text = (
                     "I couldn't match that to a listing. After a search you can say "
-                    "\"save 1 to my wishlist\" or \"add the second one to favorites.\""
+                    '"save 1 to my wishlist" or "add the second one to favorites."'
                 )
             else:
                 listing = listings[int(idx) - 1]
                 wl = _WISHLISTS.setdefault(session_id, [])
                 # Avoid duplicate entries for the same MLS in this session's wishlist
                 mls_new = listing.get("mls")
-                if any((item.get("mls") == mls_new and mls_new is not None) for item in wl):
+                if any(
+                    (item.get("mls") == mls_new and mls_new is not None) for item in wl
+                ):
                     reply_text = (
                         f"Listing #{idx} is already in your wishlist.\n\n"
-                        "Say \"show my wishlist\" to see everything you've saved in this chat."
+                        'Say "show my wishlist" to see everything you\'ve saved in this chat.'
                     )
                 else:
                     wl.append(listing)
                     reply_text = (
                         f"I've added listing #{idx} to your wishlist.\n\n"
-                        "Say \"show my wishlist\" to see everything you've saved in this chat."
+                        'Say "show my wishlist" to see everything you\'ve saved in this chat.'
                     )
         elif action == "wishlist_export":
             saved = _WISHLISTS.get(session_id) or []
             if not saved:
                 reply_text = (
                     "Your wishlist is empty, so there is nothing to export.\n\n"
-                    "After a search you can save a result with \"save 1 to my wishlist\", "
-                    "then say \"export wishlist\" or \"email my wishlist to you@example.com\"."
+                    'After a search you can save a result with "save 1 to my wishlist", '
+                    'then say "export wishlist" or "email my wishlist to you@example.com".'
                 )
             else:
                 # Allow user to specify email in the message text, e.g. "export wishlist to you@example.com".
                 email_from_text = None
-                m = re.search(r"([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})", user_text or "", re.IGNORECASE)
+                m = re.search(
+                    r"([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})",
+                    user_text or "",
+                    re.IGNORECASE,
+                )
                 if m:
                     email_from_text = m.group(1).strip()
 
@@ -556,7 +619,7 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
                     if sent:
                         reply_text = (
                             f"I've emailed your wishlist to {to_email}.\n\n"
-                            "You can also view your saved listings here with \"show my wishlist\"."
+                            'You can also view your saved listings here with "show my wishlist".'
                         )
                     else:
                         reply_text = (
@@ -570,7 +633,7 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
                 reply_text = (
                     "Your wishlist is empty.\n\n"
                     "After a search you can save a result by saying "
-                    "\"save 1 to my wishlist\" or \"add the second one to favorites.\""
+                    '"save 1 to my wishlist" or "add the second one to favorites."'
                 )
             else:
                 # Reuse listing formatter for consistency
@@ -583,7 +646,9 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
                 )
                 # Tweak the header text slightly
                 if body.startswith("Here are the listings:"):
-                    body = body.replace("Here are the listings:", "Here are your saved listings:", 1)
+                    body = body.replace(
+                        "Here are the listings:", "Here are your saved listings:", 1
+                    )
                 reply_text = body
         else:  # wishlist_clear
             if session_id in _WISHLISTS:
@@ -620,7 +685,11 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
                 # (e.g. "under $2300") and we have existing state, do NOT let the LLM
                 # reclassify it as a brand new search that would clear location/type.
                 if local_intent == "refinement" and llm_intent == "new_search":
-                    llm_filters = llm_result.get("filters") if isinstance(llm_result.get("filters"), dict) else {}
+                    llm_filters = (
+                        llm_result.get("filters")
+                        if isinstance(llm_result.get("filters"), dict)
+                        else {}
+                    )
                     # Only allow switching to new_search if the user actually provided a new location.
                     if llm_filters and llm_filters.get("location"):
                         intent = "new_search"
@@ -632,8 +701,8 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
     if intent == "more":
         if not has_state:
             reply_text = (
-                "Do a search first (e.g. \"Find 2 bedroom homes under $600k in Austin\"), "
-                "then say \"more\" to see the next page of results."
+                'Do a search first (e.g. "Find 2 bedroom homes under $600k in Austin"), '
+                'then say "more" to see the next page of results.'
             )
         else:
             state = next_page(session_id)
@@ -646,7 +715,7 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
         if not listings or not idx or not (1 <= int(idx) <= len(listings)):
             reply_text = (
                 "I can show more details for a specific result, e.g. "
-                "\"details 2\" or \"the second one\", but I couldn't match that "
+                '"details 2" or "the second one", but I couldn\'t match that '
                 "to a listing. Try again after a search."
             )
         elif stripe_payments_mod.is_configured():
@@ -659,38 +728,44 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
                 description=description,
             )
             if not checkout:
-                reply_text = "Payment setup failed. Please try again or ask for details later."
-            else:
-                sid = checkout.get("checkout_session_id") or checkout.get("id")
-                _PENDING_DETAILS_PAYMENTS[sid] = {
-                    "sender": sender,
-                    "session_id": session_id,
-                    "listing_index": int(idx),
-                }
-                _PENDING_DETAILS_BY_SESSION[session_id] = {
-                    "checkout_session_id": sid,
-                    "listing_index": int(idx),
-                }
-                amount_str = f"{stripe_payments_mod.get_amount_cents() / 100:.2f}"
-                req = RequestPayment(
-                    accepted_funds=[
-                        Funds(
-                            currency="USD",
-                            amount=amount_str,
-                            payment_method="stripe",
-                        )
-                    ],
-                    recipient=str(ctx.agent.address),
-                    deadline_seconds=300,
-                    reference=session_id,
-                    description=f"Pay ${amount_str} to unlock full details for listing #{idx}.",
-                    metadata={"stripe": checkout, "service": "listing_details"},
-                )
-                await ctx.send(sender, req)
                 reply_text = (
-                    f"Pay ${amount_str} to unlock full details for listing #{idx}. "
-                    "Complete the checkout above, then I'll send the full listing details here."
+                    "Payment setup failed. Please try again or ask for details later."
                 )
+            else:
+                sid_raw = checkout.get("checkout_session_id") or checkout.get("id")
+                sid = sid_raw if isinstance(sid_raw, str) and sid_raw else None
+                if not sid:
+                    reply_text = "Payment setup failed. Please try again or ask for details later."
+                else:
+                    _PENDING_DETAILS_PAYMENTS[sid] = {
+                        "sender": sender,
+                        "session_id": session_id,
+                        "listing_index": int(idx),
+                    }
+                    _PENDING_DETAILS_BY_SESSION[session_id] = {
+                        "checkout_session_id": sid,
+                        "listing_index": int(idx),
+                    }
+                    amount_str = f"{stripe_payments_mod.get_amount_cents() / 100:.2f}"
+                    req = RequestPayment(
+                        accepted_funds=[
+                            Funds(
+                                currency="USD",
+                                amount=amount_str,
+                                payment_method="stripe",
+                            )
+                        ],
+                        recipient=str(ctx.agent.address),
+                        deadline_seconds=300,
+                        reference=session_id,
+                        description=f"Pay ${amount_str} to unlock full details for listing #{idx}.",
+                        metadata={"stripe": checkout, "service": "listing_details"},
+                    )
+                    await ctx.send(sender, req)
+                    reply_text = (
+                        f"Pay ${amount_str} to unlock full details for listing #{idx}. "
+                        "Complete the checkout above, then I'll send the full listing details here."
+                    )
         else:
             # No Stripe configured: show details for free
             listing = listings[int(idx) - 1]
@@ -712,7 +787,17 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
             ctx.logger.info(
                 "chat_refinement parsed=%s -> state=%s",
                 parsed,
-                {k: state.get(k) for k in ("location", "deal_type", "bedrooms", "max_price", "property_type", "page")},
+                {
+                    k: state.get(k)
+                    for k in (
+                        "location",
+                        "deal_type",
+                        "bedrooms",
+                        "max_price",
+                        "property_type",
+                        "page",
+                    )
+                },
             )
         except Exception:
             pass
@@ -728,16 +813,32 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
                 "chat_new_search intent=%s local_intent=%s llm_intent=%s parsed=%s -> state=%s",
                 intent,
                 local_intent,
-                (llm_result or {}).get("intent") if isinstance(llm_result, dict) else None,
+                (llm_result or {}).get("intent")
+                if isinstance(llm_result, dict)
+                else None,
                 parsed,
-                {k: state.get(k) for k in ("location", "deal_type", "bedrooms", "max_price", "property_type", "page")},
+                {
+                    k: state.get(k)
+                    for k in (
+                        "location",
+                        "deal_type",
+                        "bedrooms",
+                        "max_price",
+                        "property_type",
+                        "page",
+                    )
+                },
             )
         except Exception:
             pass
-        if not state.get("location") and not state.get("max_price") and not state.get("bedrooms"):
+        if (
+            not state.get("location")
+            and not state.get("max_price")
+            and not state.get("bedrooms")
+        ):
             reply_text = (
                 "I couldn't understand the search. Try something like: "
-                "\"Find 2 bedroom homes under $600k in Austin.\""
+                '"Find 2 bedroom homes under $600k in Austin."'
             )
         else:
             reply_text = await _handle_search(ctx, sender, session_id, state)
@@ -757,15 +858,24 @@ async def on_ack(ctx: Context, sender: str, msg: ChatAcknowledgement):
 
 async def on_payment_commit(ctx: Context, sender: str, msg: CommitPayment):
     """Verify Stripe payment and deliver full listing details."""
-    if getattr(msg.funds, "payment_method", None) != "stripe" or not getattr(msg, "transaction_id", None):
-        await ctx.send(sender, RejectPayment(reason="Unsupported payment method (expected stripe)."))
+    if getattr(msg.funds, "payment_method", None) != "stripe" or not getattr(
+        msg, "transaction_id", None
+    ):
+        await ctx.send(
+            sender,
+            RejectPayment(reason="Unsupported payment method (expected stripe)."),
+        )
         return
     tid = msg.transaction_id
-    paid = await asyncio.to_thread(stripe_payments_mod.verify_checkout_session_paid, tid)
+    paid = await asyncio.to_thread(
+        stripe_payments_mod.verify_checkout_session_paid, tid
+    )
     if not paid:
         await ctx.send(
             sender,
-            RejectPayment(reason="Stripe payment not completed yet. Please finish checkout."),
+            RejectPayment(
+                reason="Stripe payment not completed yet. Please finish checkout."
+            ),
         )
         return
     await ctx.send(sender, CompletePayment(transaction_id=tid))
@@ -774,20 +884,45 @@ async def on_payment_commit(ctx: Context, sender: str, msg: CommitPayment):
         await ctx.send(
             sender,
             ChatMessage(
-                content=[TextContent(type="text", text="Payment received, but this session expired. Run a search and request details again.")],
+                content=[
+                    TextContent(
+                        type="text",
+                        text="Payment received, but this session expired. Run a search and request details again.",
+                    )
+                ],
                 msg_id=uuid4(),
                 timestamp=datetime.now(timezone.utc),
             ),
         )
         return
-    session_id = pending.get("session_id")
+    paid_session_id = pending.get("session_id")
     idx = pending.get("listing_index")
-    listings = _LAST_RESULTS.get(session_id) or []
-    if not idx or not (1 <= idx <= len(listings)):
+    if not isinstance(paid_session_id, str):
         await ctx.send(
             sender,
             ChatMessage(
-                content=[TextContent(type="text", text="Payment received. Your search session changed; run a search and request details again if needed.")],
+                content=[
+                    TextContent(
+                        type="text",
+                        text="Payment received. Your search session changed; run a search and request details again if needed.",
+                    )
+                ],
+                msg_id=uuid4(),
+                timestamp=datetime.now(timezone.utc),
+            ),
+        )
+        return
+    listings = _LAST_RESULTS.get(paid_session_id) or []
+    if not isinstance(idx, int) or not (1 <= idx <= len(listings)):
+        await ctx.send(
+            sender,
+            ChatMessage(
+                content=[
+                    TextContent(
+                        type="text",
+                        text="Payment received. Your search session changed; run a search and request details again if needed.",
+                    )
+                ],
                 msg_id=uuid4(),
                 timestamp=datetime.now(timezone.utc),
             ),
@@ -813,13 +948,17 @@ async def on_payment_commit(ctx: Context, sender: str, msg: CommitPayment):
 
 async def on_payment_reject(ctx: Context, sender: str, msg: RejectPayment):
     """Clear any pending payment for this sender (best-effort)."""
-    to_remove = [tid for tid, p in _PENDING_DETAILS_PAYMENTS.items() if p.get("sender") == sender]
+    to_remove = [
+        tid for tid, p in _PENDING_DETAILS_PAYMENTS.items() if p.get("sender") == sender
+    ]
     for tid in to_remove:
         _PENDING_DETAILS_PAYMENTS.pop(tid, None)
 
 
 agent.include(chat_proto, publish_manifest=True)
-agent.include(build_payment_proto(on_payment_commit, on_payment_reject), publish_manifest=True)
+agent.include(
+    build_payment_proto(on_payment_commit, on_payment_reject), publish_manifest=True
+)
 
 if __name__ == "__main__":
     print("Property Finder agent address:", agent.address)
