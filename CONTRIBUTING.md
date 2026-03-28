@@ -10,6 +10,7 @@ This guide explains how to add agents in a consistent, review-friendly format.
 1. Fork the repository and clone your fork.
 2. Create a feature branch from `main`.
 3. Keep changes focused (one feature/fix per PR).
+4. Use `./setup.sh <example-folder>` to quickly test any example locally.
 
 ```bash
 git checkout -b feat/short-description
@@ -49,6 +50,29 @@ Recommended folder layout:
   assets/
     demo.png
 ```
+
+## Tagging and Categorization
+
+Every example should be tagged in its README with a difficulty level and category to help users navigate the repository.
+
+**Difficulty levels:**
+
+- **Beginner** — single agent, minimal setup, no external services
+- **Intermediate** — API integrations, payment protocols, multi-file agents
+- **Advanced** — multi-agent systems, Web3, complex orchestration
+
+**Categories** (use one or more):
+
+`Getting Started` · `LLM` · `A2A` · `MCP` · `Payments` · `RAG` · `Multi-Agent` · `Web3` · `Integration` · `Frontend` · `Tooling`
+
+Add these to the top of your example README:
+
+```markdown
+- **Category:** `LLM`, `Payments`
+- **Difficulty:** Intermediate
+```
+
+When you add a new example, also add it to the examples index table in the root [README.md](README.md).
 
 ## Local Development Checks (CLI)
 
@@ -185,6 +209,15 @@ PRs also use a default template:
     - `typecheck`
     - `validate-architecture`
     - `test`
+
+## Docker Support
+
+If your example benefits from containerization, include a `Dockerfile` in the example folder. The repository also provides a root-level `Dockerfile` that can run any example:
+
+```bash
+docker build --build-arg EXAMPLE=your-example-folder -t your-example .
+docker run --env-file your-example-folder/.env your-example
+```
 
 ## Useful Links
 
