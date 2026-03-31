@@ -2,16 +2,17 @@
 Main entry point for the Time Agent with A2A Outbound Adapter.
 This exposes the agent on Agentverse for discovery and communication.
 """
+
 import logging
 from typing import Any
 
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
-
 from uagents_adapter import A2AAgentConfig, SingleA2AAdapter, a2a_servers
 from shared.executor import BaseAgentExecutor
+
+# Load environment variables from .env file
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -67,7 +68,8 @@ class AgentRunner:
                 logger.error("Executor for agent %s not found", self.agent_name)
                 raise ValueError(f"Executor for agent {self.agent_name} not found")
             logger.info(
-                "Creating SingleA2AAdapter coordinator on port %d", self.coordinator_port
+                "Creating SingleA2AAdapter coordinator on port %d",
+                self.coordinator_port,
             )
             coordinator = SingleA2AAdapter(
                 agent_executor=executor,
@@ -87,5 +89,6 @@ class AgentRunner:
         except Exception as e:
             logger.exception("Error running agent %s: %s", self.agent_name, e)
             self.running = False
+
 
 __all__ = ["AgentRunner"]

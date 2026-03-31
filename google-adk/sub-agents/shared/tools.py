@@ -13,6 +13,7 @@ from google.adk.tools.google_search_tool import google_search
 
 logger = logging.getLogger("DueDiligencePipeline")
 
+
 def generate_signed_gcs_url(
     artifact_version: Any,
     expires_in_minutes: int = 300,
@@ -42,11 +43,12 @@ async def generate_financial_chart(
     bear_rates: str,
     base_rates: str,
     bull_rates: str,
-    tool_context: ToolContext
+    tool_context: ToolContext,
 ) -> dict[str, Any]:
     try:
         import matplotlib.pyplot as plt
         import matplotlib
+
         matplotlib.use("Agg")
         import io
         from datetime import datetime
@@ -84,7 +86,9 @@ async def generate_financial_chart(
         plt.close()
         buf.seek(0)
 
-        artifact_name = f"revenue_chart_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.png"
+        artifact_name = (
+            f"revenue_chart_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.png"
+        )
         artifact = types.Part.from_bytes(data=buf.read(), mime_type="image/png")
 
         version = await tool_context.save_artifact(
@@ -109,9 +113,9 @@ async def generate_financial_chart(
         logger.exception("Chart generation failed")
         return {"status": "error", "message": str(e)}
 
+
 async def generate_html_report(
-    report_data: str,
-    tool_context: ToolContext
+    report_data: str, tool_context: ToolContext
 ) -> dict[str, Any]:
     from datetime import datetime
 
@@ -123,7 +127,9 @@ async def generate_html_report(
         )
 
         html = response.text.strip("` \n")
-        artifact_name = f"investment_report_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.html"
+        artifact_name = (
+            f"investment_report_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.html"
+        )
 
         artifact = types.Part.from_bytes(
             data=html.encode("utf-8"),
@@ -152,9 +158,9 @@ async def generate_html_report(
         logger.exception("HTML report generation failed")
         return {"status": "error", "message": str(e)}
 
+
 async def generate_infographic(
-    data_summary: str,
-    tool_context: ToolContext
+    data_summary: str, tool_context: ToolContext
 ) -> dict[str, Any]:
     from datetime import datetime, timezone
 
@@ -163,9 +169,7 @@ async def generate_infographic(
         response = await client.aio.models.generate_content(
             model="gemini-3-pro-image-preview",
             contents=data_summary,
-            config=types.GenerateContentConfig(
-                response_modalities=["TEXT", "IMAGE"]
-            )
+            config=types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"]),
         )
 
         # Validate response has candidates
@@ -215,6 +219,7 @@ async def generate_infographic(
     except Exception as e:
         logger.exception("Infographic generation failed")
         return {"status": "error", "message": str(e)}
+
 
 __all__ = [
     "generate_financial_chart",

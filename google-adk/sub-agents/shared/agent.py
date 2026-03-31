@@ -1,4 +1,3 @@
-
 import os
 from google.adk.agents import Agent
 from google.adk.agents.llm_agent import ToolUnion
@@ -15,9 +14,10 @@ from google.adk.artifacts import GcsArtifactService
 from shared.executor import BaseAgentExecutor
 from shared.runner import AgentRunner
 
+
 class AgentManager(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    
+
     GOOGLE_STORAGE_BUCKET_NAME: str
     GOOGLE_API_KEY: str
     ASI_API_KEY: str
@@ -47,13 +47,12 @@ class AgentManager(BaseModel):
     @staticmethod
     def load(agent_key: str) -> "AgentManager":
         prefix: str = agent_key.upper().replace(" ", "_")
-        
+
         required_vars = [
             # shared settings
             "GOOGLE_STORAGE_BUCKET_NAME",
             "GOOGLE_API_KEY",
             "ASI_API_KEY",
-
             # agent specific settings
             f"{prefix}_NAME",
             f"{prefix}_MODEL",
@@ -66,7 +65,6 @@ class AgentManager(BaseModel):
             f"{prefix}_COORDINATOR_PORT",
             f"{prefix}_SEED",
             f"{prefix}_SPECIALTIES",
-
             # common settings
             "AGENT_CACHE_MIN_TOKENS",
             "AGENT_CACHE_TTL_SECONDS",
@@ -86,7 +84,6 @@ class AgentManager(BaseModel):
             GOOGLE_STORAGE_BUCKET_NAME=env_vars["GOOGLE_STORAGE_BUCKET_NAME"],
             GOOGLE_API_KEY=env_vars["GOOGLE_API_KEY"],
             ASI_API_KEY=env_vars["ASI_API_KEY"],
-
             # agent specific settings
             NAME=env_vars[f"{prefix}_NAME"],
             MODEL=env_vars[f"{prefix}_MODEL"],
@@ -101,7 +98,6 @@ class AgentManager(BaseModel):
             SPECIALTIES=[
                 s.strip() for s in env_vars[f"{prefix}_SPECIALTIES"].split(",")
             ],
-
             # common settings
             CACHE_MIN_TOKENS=int(env_vars["AGENT_CACHE_MIN_TOKENS"]),
             CACHE_TTL_SECONDS=int(env_vars["AGENT_CACHE_TTL_SECONDS"]),
@@ -109,7 +105,7 @@ class AgentManager(BaseModel):
             COMPACTION_INTERVAL=int(env_vars["AGENT_COMPACTION_INTERVAL"]),
             COMPACTION_OVERLAP=int(env_vars["AGENT_COMPACTION_OVERLAP"]),
         )
-    
+
     def get_agent(self, tools: list[ToolUnion]) -> Agent:
         """Helper to get the Agent."""
         if self.agent:
@@ -125,7 +121,7 @@ class AgentManager(BaseModel):
                 thinking_config=types.ThinkingConfig(
                     thinking_level=types.ThinkingLevel.MEDIUM
                 )
-            )
+            ),
         )
         return self.agent
 
@@ -144,12 +140,12 @@ class AgentManager(BaseModel):
             context_cache_config=ContextCacheConfig(
                 min_tokens=self.CACHE_MIN_TOKENS,
                 ttl_seconds=self.CACHE_TTL_SECONDS,
-                cache_intervals=self.CACHE_INTERVALS
+                cache_intervals=self.CACHE_INTERVALS,
             ),
             events_compaction_config=EventsCompactionConfig(
                 compaction_interval=self.COMPACTION_INTERVAL,
-                overlap_size=self.COMPACTION_OVERLAP
-            )
+                overlap_size=self.COMPACTION_OVERLAP,
+            ),
         )
 
     def get_runner(self, tools: list[ToolUnion]) -> Runner:
@@ -161,19 +157,18 @@ class AgentManager(BaseModel):
             session_service=self.get_session_service(),
             artifact_service=GcsArtifactService(
                 bucket_name=self.GOOGLE_STORAGE_BUCKET_NAME
-            )
+            ),
         )
-    
+
     def get_executor(self, tools: list[ToolUnion]) -> BaseAgentExecutor:
         """Helper to get the Agent Executor."""
         if self.executor:
             return self.executor
         self.executor = BaseAgentExecutor(
-            app=self.get_app(tools=tools),
-            session_service=self.get_session_service()
+            app=self.get_app(tools=tools), session_service=self.get_session_service()
         )
         return self.executor
-    
+
     def get_agent_runner(self, tools: list[ToolUnion]) -> AgentRunner:
         """Helper to get the Agent Runner."""
         if self.runner:
@@ -187,13 +182,14 @@ class AgentManager(BaseModel):
             a2a_port=self.A2A_PORT,
             agent_seed=self.SEED,
             specialties=self.SPECIALTIES,
-            executor=self.get_executor(tools=tools)
+            executor=self.get_executor(tools=tools),
         )
         return self.runner
-    
+
     def run_agent(self, tools: list[ToolUnion]) -> None:
         """Run the Agent."""
         runner = self.get_agent_runner(tools=tools)
         runner.run()
+
 
 __all__ = ["AgentManager"]

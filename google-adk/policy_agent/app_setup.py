@@ -59,16 +59,15 @@ agent = Agent(
     ),
     static_instruction=STATIC_POLICY_HEADER,
     instruction="Default: be concise and include at most two citations.",
-    tools=[google_search]  # Add google_search tool for web facts
+    tools=[google_search],  # Add google_search tool for web facts
 )
 
 app = App(
     name="policy_qa_app",
     context_cache_config=ContextCacheConfig(
-        ttl_seconds=3600,     # cache the header for 1 hour
-        cache_intervals=5,    # force a refresh every 5 requests (guardrail)
-        min_tokens=1000       # only cache if header is "worth it"
+        ttl_seconds=3600,  # cache the header for 1 hour
+        cache_intervals=5,  # force a refresh every 5 requests (guardrail)
+        min_tokens=1000,  # only cache if header is "worth it"
     ),
-    root_agent=agent
+    root_agent=agent,
 )
-

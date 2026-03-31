@@ -42,11 +42,12 @@ async def generate_financial_chart(
     bear_rates: str,
     base_rates: str,
     bull_rates: str,
-    tool_context: ToolContext
+    tool_context: ToolContext,
 ) -> dict[str, Any]:
     try:
         import matplotlib.pyplot as plt
         import matplotlib
+
         matplotlib.use("Agg")
         import io
         from datetime import datetime
@@ -84,9 +85,10 @@ async def generate_financial_chart(
         plt.close()
         buf.seek(0)
 
-        artifact_name = f"revenue_chart_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.png"
-        artifact = types.Part.from_bytes(
-            data=buf.read(), mime_type="image/png")
+        artifact_name = (
+            f"revenue_chart_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.png"
+        )
+        artifact = types.Part.from_bytes(data=buf.read(), mime_type="image/png")
 
         version = await tool_context.save_artifact(
             filename=artifact_name,
@@ -113,8 +115,7 @@ async def generate_financial_chart(
 
 
 async def generate_html_report(
-    report_data: str,
-    tool_context: ToolContext
+    report_data: str, tool_context: ToolContext
 ) -> dict[str, Any]:
     from datetime import datetime
     from google.genai import Client, types
@@ -263,7 +264,9 @@ footer {{
 """
 
         # 3️⃣ Save artifact
-        artifact_name = f"investment_report_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.html"
+        artifact_name = (
+            f"investment_report_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.html"
+        )
 
         artifact = types.Part.from_bytes(
             data=html.encode("utf-8"),
@@ -293,8 +296,7 @@ footer {{
 
 
 async def generate_infographic(
-    data_summary: str,
-    tool_context: ToolContext
+    data_summary: str, tool_context: ToolContext
 ) -> dict[str, Any]:
     from datetime import datetime
 
@@ -303,14 +305,14 @@ async def generate_infographic(
         response = await client.aio.models.generate_content(
             model="gemini-3-pro-image-preview",
             contents=data_summary,
-            config=types.GenerateContentConfig(
-                response_modalities=["TEXT", "IMAGE"]
-            )
+            config=types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"]),
         )
 
         for part in response.candidates[0].content.parts:
             if part.inline_data and part.inline_data.mime_type.startswith("image/"):
-                artifact_name = f"infographic_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.png"
+                artifact_name = (
+                    f"infographic_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.png"
+                )
                 artifact = types.Part.from_bytes(
                     data=part.inline_data.data,
                     mime_type=part.inline_data.mime_type,

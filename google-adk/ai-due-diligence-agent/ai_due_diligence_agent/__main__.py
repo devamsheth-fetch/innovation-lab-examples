@@ -2,12 +2,13 @@
 Main entry point for the AI Due Diligence Analyst with uAgents Chat Protocol.
 This exposes the agent on Agentverse for discovery and communication.
 """
+
 from dotenv import load_dotenv
+
+from ai_due_diligence_agent.executor import agent, run_agent
 
 # Load environment variables from .env file
 load_dotenv()
-
-from ai_due_diligence_agent.executor import agent, run_agent
 
 
 def main():

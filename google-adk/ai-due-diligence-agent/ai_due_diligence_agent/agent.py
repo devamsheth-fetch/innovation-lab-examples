@@ -12,7 +12,11 @@ Pattern Reference: https://google.github.io/adk-docs/agents/multi-agents/#sequen
 
 from google.adk.agents import LlmAgent, SequentialAgent
 from google.adk.tools.google_search_tool import google_search
-from ai_due_diligence_agent.tools import generate_html_report, generate_infographic, generate_financial_chart
+from ai_due_diligence_agent.tools import (
+    generate_html_report,
+    generate_infographic,
+    generate_financial_chart,
+)
 
 # ============================================================================
 # Stage 1: Company Research Agent
