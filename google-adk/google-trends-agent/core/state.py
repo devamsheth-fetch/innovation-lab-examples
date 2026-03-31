@@ -1,5 +1,5 @@
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from uagents import Context
 
 _STATE_TTL = 30 * 60  # 30 minutes
@@ -28,6 +28,7 @@ def extract_text(msg) -> str:
     """Extract plain text from a ChatMessage, stripping any leading @address prefix."""
     import re
     from uagents_core.contrib.protocols.chat import TextContent
+
     parts = []
     for item in msg.content:
         if isinstance(item, TextContent):
@@ -43,8 +44,11 @@ def make_chat(text: str):
     from datetime import datetime, timezone
     from uuid import uuid4
     from uagents_core.contrib.protocols.chat import (
-        ChatMessage, EndSessionContent, TextContent,
+        ChatMessage,
+        EndSessionContent,
+        TextContent,
     )
+
     return ChatMessage(
         timestamp=datetime.now(timezone.utc),
         msg_id=uuid4(),
@@ -60,6 +64,7 @@ def make_chat_ongoing(text: str):
     from datetime import datetime, timezone
     from uuid import uuid4
     from uagents_core.contrib.protocols.chat import ChatMessage, TextContent
+
     return ChatMessage(
         timestamp=datetime.now(timezone.utc),
         msg_id=uuid4(),

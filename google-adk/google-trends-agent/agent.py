@@ -12,8 +12,6 @@ Usage:
 Environment variables: see .env.example
 """
 
-import os
-
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -31,7 +29,7 @@ agent = Agent(
     name="google-trends-agent",
     seed=AGENT_SEED,
     port=AGENT_PORT,
-    mailbox=True,             # connect to Agentverse mailroom
+    mailbox=True,  # connect to Agentverse mailroom
     publish_agent_details=True,  # appear in ASI:One marketplace search
 )
 

@@ -79,6 +79,7 @@ _TABLE_NAMES = [
     "bigquery-public-data.google_trends.top_rising_terms",
 ]
 
+
 def _clean_sql(text: str) -> str:
     text = re.sub(r"```sql", "", text, flags=re.IGNORECASE)
     text = re.sub(r"```", "", text)

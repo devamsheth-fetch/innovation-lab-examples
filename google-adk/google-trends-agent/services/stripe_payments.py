@@ -21,6 +21,7 @@ from core.config import (
 
 def _stripe():
     import stripe
+
     stripe.api_key = STRIPE_SECRET_KEY
     return stripe
 
@@ -36,21 +37,23 @@ def _create_session(*, user_address: str, chat_session_id: str, query: str) -> d
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
         mode="payment",
-        ui_mode="embedded_page",
+        ui_mode="embedded",
         redirect_on_completion="if_required",
         return_url=f"{STRIPE_SUCCESS_URL}?session_id={{CHECKOUT_SESSION_ID}}",
         expires_at=_expires_at(),
-        line_items=[{
-            "price_data": {
-                "currency": STRIPE_CURRENCY,
-                "product_data": {
-                    "name": STRIPE_PRODUCT_NAME,
-                    "description": description,
+        line_items=[
+            {
+                "price_data": {
+                    "currency": STRIPE_CURRENCY,
+                    "product_data": {
+                        "name": STRIPE_PRODUCT_NAME,
+                        "description": description,
+                    },
+                    "unit_amount": STRIPE_AMOUNT_CENTS,
                 },
-                "unit_amount": STRIPE_AMOUNT_CENTS,
-            },
-            "quantity": 1,
-        }],
+                "quantity": 1,
+            }
+        ],
         metadata={
             "user_address": user_address,
             "session_id": chat_session_id,
@@ -63,11 +66,13 @@ def _create_session(*, user_address: str, chat_session_id: str, query: str) -> d
         "publishable_key": STRIPE_PUBLISHABLE_KEY,
         "currency": STRIPE_CURRENCY,
         "amount_cents": str(STRIPE_AMOUNT_CENTS),
-        "ui_mode": "embedded_page",
+        "ui_mode": "embedded",
     }
 
 
-async def create_checkout_session(*, user_address: str, chat_session_id: str, query: str) -> dict:
+async def create_checkout_session(
+    *, user_address: str, chat_session_id: str, query: str
+) -> dict:
     """Async wrapper around Stripe session creation (runs in thread pool)."""
     return await asyncio.to_thread(
         _create_session,

@@ -39,8 +39,14 @@ from services.stripe_payments import create_checkout_session, verify_paid
 # ---------------------------------------------------------------------------
 
 _GREETING_STARTERS = (
-    "hello", "hi", "hey", "what can you do", "who are you",
-    "how can you help", "help", "start",
+    "hello",
+    "hi",
+    "hey",
+    "what can you do",
+    "who are you",
+    "how can you help",
+    "help",
+    "start",
 )
 
 _EXAMPLE_QUERIES = (
@@ -58,8 +64,18 @@ def _is_greeting(text: str) -> bool:
 
 def _looks_like_trends_query(text: str) -> bool:
     keywords = (
-        "trend", "search", "top", "popular", "rising", "terms",
-        "queries", "google", "rank", "week", "month", "country",
+        "trend",
+        "search",
+        "top",
+        "popular",
+        "rising",
+        "terms",
+        "queries",
+        "google",
+        "rank",
+        "week",
+        "month",
+        "country",
     )
     t = text.lower()
     return any(k in t for k in keywords)
@@ -69,11 +85,18 @@ def _looks_like_trends_query(text: str) -> bool:
 # Chat handler — called for every incoming ChatMessage
 # ---------------------------------------------------------------------------
 
+
 async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
     text = extract_text(msg)
 
-    # --- Greeting / help ---
+    state = load_state(ctx, sender)
+    awaiting_payment = state.get("awaiting_payment", False)
+    saved_query = state.get("query", "")
+
+    # --- Greeting / help — clear any pending payment state so user isn't stuck ---
     if _is_greeting(text) or not text:
+        if awaiting_payment:
+            clear_state(ctx, sender)
         await ctx.send(
             sender,
             make_chat(
@@ -85,16 +108,8 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
         )
         return
 
-    state = load_state(ctx, sender)
-    awaiting_payment = state.get("awaiting_payment", False)
-    saved_query = state.get("query", "")
-
     # --- User re-sends a message while payment is still pending ---
     if awaiting_payment and saved_query:
-        if _is_greeting(text):
-            clear_state(ctx, sender)
-            return
-
         # First: check if the stored session is already paid (Agentverse may not
         # have delivered CommitPayment even though Stripe processed the payment).
         # Only check sessions that are at least 60s old to avoid false positives
@@ -110,9 +125,16 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
                 already_paid = False
 
             if already_paid:
-                ctx.logger.info(f"Fallback: session {stored_session_id} already paid — running query")
+                ctx.logger.info(
+                    f"Fallback: session {stored_session_id} already paid — running query"
+                )
                 clear_state(ctx, sender)
-                await ctx.send(sender, make_chat_ongoing("Payment confirmed! Running your Google Trends query..."))
+                await ctx.send(
+                    sender,
+                    make_chat_ongoing(
+                        "Payment confirmed! Running your Google Trends query..."
+                    ),
+                )
                 try:
                     result = await run_trends_query(saved_query)
                 except Exception as exc:
@@ -130,7 +152,10 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
             )
         except Exception as exc:
             ctx.logger.error(f"Stripe session refresh failed: {exc}")
-            await ctx.send(sender, make_chat("Sorry, payment setup failed. Please try again later."))
+            await ctx.send(
+                sender,
+                make_chat("Sorry, payment setup failed. Please try again later."),
+            )
             return
         state["pending_stripe"] = fresh_checkout
         state["session_created_at"] = time.time()
@@ -179,7 +204,9 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
         )
     except Exception as exc:
         ctx.logger.error(f"Stripe session creation failed: {exc}")
-        await ctx.send(sender, make_chat("Sorry, payment setup failed. Please try again later."))
+        await ctx.send(
+            sender, make_chat("Sorry, payment setup failed. Please try again later.")
+        )
         return
 
     # Persist state
@@ -225,6 +252,7 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage):
 # Payment commit handler — payment was approved by the user
 # ---------------------------------------------------------------------------
 
+
 async def on_commit(ctx: Context, sender: str, msg: CommitPayment):
     if not msg.transaction_id:
         await ctx.send(sender, RejectPayment(reason="Missing transaction ID."))
@@ -243,7 +271,9 @@ async def on_commit(ctx: Context, sender: str, msg: CommitPayment):
     if not paid:
         await ctx.send(
             sender,
-            RejectPayment(reason="Payment not completed. Please finish the Stripe checkout first."),
+            RejectPayment(
+                reason="Payment not completed. Please finish the Stripe checkout first."
+            ),
         )
         return
 
@@ -255,15 +285,25 @@ async def on_commit(ctx: Context, sender: str, msg: CommitPayment):
     clear_state(ctx, sender)
 
     if not query:
-        await ctx.send(sender, make_chat("Payment received! But I lost track of your query. Please ask again."))
+        await ctx.send(
+            sender,
+            make_chat(
+                "Payment received! But I lost track of your query. Please ask again."
+            ),
+        )
         return
 
-    await ctx.send(sender, make_chat_ongoing("Payment confirmed! Running your Google Trends query..."))
+    await ctx.send(
+        sender,
+        make_chat_ongoing("Payment confirmed! Running your Google Trends query..."),
+    )
     try:
         result = await run_trends_query(query)
     except Exception as exc:
         ctx.logger.error(f"Trends query failed: {exc}")
-        result = "Sorry, an error occurred while querying Google Trends. Please try again."
+        result = (
+            "Sorry, an error occurred while querying Google Trends. Please try again."
+        )
 
     await ctx.send(sender, make_chat(result))
 
@@ -272,12 +312,13 @@ async def on_commit(ctx: Context, sender: str, msg: CommitPayment):
 # Payment reject handler — user declined or payment failed
 # ---------------------------------------------------------------------------
 
+
 async def on_reject(ctx: Context, sender: str, msg: RejectPayment):
     clear_state(ctx, sender)
     reason = msg.reason or "Payment was rejected."
     await ctx.send(
         sender,
-        make_chat(f"Payment not completed: {reason}\n\nSend your query again whenever you're ready."),
+        make_chat(
+            f"Payment not completed: {reason}\n\nSend your query again whenever you're ready."
+        ),
     )
-
-
