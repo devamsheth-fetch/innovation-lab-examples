@@ -42,6 +42,8 @@ services:
       - PARTS_AGENT_HOST=parts-agent
     ports:
       - "8002:8002"
+    volumes:
+      - ./reports:/app/reports
     healthcheck:
       test: ["CMD", "python3", "-c",
              "import socket; s=socket.socket(); s.settimeout(2); s.connect(('localhost', 8002)); s.close()"]
@@ -126,6 +128,20 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+
+# ── Reports file server (downloadable Excel spreadsheets) ─────────────────────
+  reports-server:
+    image: python:3.11-slim
+    profiles: [bureau]
+    container_name: appliance-reports-server
+    command: ["python", "-m", "http.server", "8080", "--directory", "/reports"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./reports:/reports
+    networks:
+      - agent-network
+    restart: unless-stopped
 
 networks:
   agent-network:
