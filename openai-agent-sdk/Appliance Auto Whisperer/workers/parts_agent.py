@@ -33,7 +33,11 @@ from uagents import Agent, Context, Protocol
 from uagents.registration import AlmanacApiRegistrationPolicy
 
 from app.services.brightdata.part_price_service import fetch_parts_deterministic
-from app.uagents_protocol.schemas import PartSource, PartsSourcingRequest, PartsSourcingResponse
+from app.uagents_protocol.schemas import (
+    PartSource,
+    PartsSourcingRequest,
+    PartsSourcingResponse,
+)
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -135,8 +139,12 @@ async def _do_parts_lookup(msg: PartsSourcingRequest) -> PartsSourcingResponse:
     return resp
 
 
-@parts_agent.on_rest_post("/diagnose-parts", PartsSourcingRequest, PartsSourcingResponse)
-async def handle_rest_parts(ctx: Context, req: PartsSourcingRequest) -> PartsSourcingResponse:
+@parts_agent.on_rest_post(
+    "/diagnose-parts", PartsSourcingRequest, PartsSourcingResponse
+)
+async def handle_rest_parts(
+    ctx: Context, req: PartsSourcingRequest
+) -> PartsSourcingResponse:
     return await _do_parts_lookup(req)
 
 

@@ -75,7 +75,9 @@ def format_diagnostic_markdown(
             f"— **[→ Buy Now]({purchase_url})**"
         )
     else:
-        best_deal_line = f"🏆 **Best source: {source_site}** — **[→ Check Price]({purchase_url})**"
+        best_deal_line = (
+            f"🏆 **Best source: {source_site}** — **[→ Check Price]({purchase_url})**"
+        )
 
     # ── Agent recommendation ──────────────────────────────────────────────
     recommendation = _build_recommendation(all_sources, price, source_site, labor)
@@ -184,7 +186,9 @@ def _build_recommendation(
         )
 
     total_stores = len(set(r.get("source_site", "") for r in priced))
-    lines.append(f"> Compared **{len(priced)} listings** across **{total_stores} stores**.")
+    lines.append(
+        f"> Compared **{len(priced)} listings** across **{total_stores} stores**."
+    )
 
     return "\n".join(lines) + "\n"
 
