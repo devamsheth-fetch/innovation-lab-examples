@@ -16,6 +16,7 @@ Routing:
   Set PARTS_AGENT_HOST when running in Docker so the endpoint hostname
   matches the container name (e.g. "parts-agent") instead of "127.0.0.1".
 """
+
 import logging
 import os
 import sys
@@ -25,6 +26,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from dotenv import load_dotenv
+
 load_dotenv(PROJECT_ROOT / ".env")
 
 from uagents import Agent, Context, Protocol
@@ -72,17 +74,27 @@ parts_agent.include(parts_protocol, publish_manifest=False)
 
 # ── REST endpoint (used by orchestrator for reliable direct HTTP calls) ───────
 
+
 async def _do_parts_lookup(msg: PartsSourcingRequest) -> PartsSourcingResponse:
     """Shared logic for both protocol handler and REST endpoint."""
-    log.info("[parts] Request received: part=%s (%s) brand=%s model=%s",
-             msg.part_name, msg.part_number, msg.brand or "?", msg.model_number or "?")
+    log.info(
+        "[parts] Request received: part=%s (%s) brand=%s model=%s",
+        msg.part_name,
+        msg.part_number,
+        msg.brand or "?",
+        msg.model_number or "?",
+    )
     try:
         d = await fetch_parts_deterministic(
-            msg.part_name, msg.part_number, msg.context_text,
-            brand=msg.brand, model_number=msg.model_number,
+            msg.part_name,
+            msg.part_number,
+            msg.context_text,
+            brand=msg.brand,
+            model_number=msg.model_number,
             appliance_type=msg.appliance_type,
         )
         excel_path = str(d.get("excel_path") or "")
+        raw_sources: list[dict] = d.get("all_sources", [])  # type: ignore[assignment]
         all_sources = [
             PartSource(
                 source_site=str(s.get("source_site") or ""),
@@ -92,10 +104,10 @@ async def _do_parts_lookup(msg: PartsSourcingRequest) -> PartsSourcingResponse:
                 match_type=str(s.get("match_type") or "exact"),
                 suggestion=str(s.get("suggestion") or ""),
             )
-            for s in d.get("all_sources", [])
+            for s in raw_sources
         ]
         resp = PartsSourcingResponse(
-            price_usd=float(d.get("price_usd") or 0),
+            price_usd=float(d.get("price_usd") or 0),  # type: ignore[arg-type]
             purchase_url=str(d.get("purchase_url") or ""),
             stock_status=str(d.get("stock_status") or ""),
             source_site=str(d.get("source_site") or ""),
@@ -103,12 +115,21 @@ async def _do_parts_lookup(msg: PartsSourcingRequest) -> PartsSourcingResponse:
             excel_path=excel_path,
             session_id=msg.session_id,
         )
-        log.info("[parts] Done — $%.2f at %s (%d sources)", d["price_usd"], d["source_site"], len(all_sources))
+        log.info(
+            "[parts] Done — $%.2f at %s (%d sources)",
+            d["price_usd"],
+            d["source_site"],
+            len(all_sources),
+        )
     except Exception as exc:  # noqa: BLE001
         log.exception("[parts] Service error — sending empty response: %s", exc)
         resp = PartsSourcingResponse(
-            price_usd=0.0, purchase_url="", stock_status="error",
-            source_site="error", all_sources=[], excel_path="",
+            price_usd=0.0,
+            purchase_url="",
+            stock_status="error",
+            source_site="error",
+            all_sources=[],
+            excel_path="",
             session_id=msg.session_id,
         )
     return resp
@@ -120,6 +141,7 @@ async def handle_rest_parts(ctx: Context, req: PartsSourcingRequest) -> PartsSou
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
+
 
 @parts_agent.on_event("startup")
 async def startup(ctx: Context):

@@ -18,7 +18,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -48,6 +47,7 @@ _HEADERS = {
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def fetch_parts_deterministic(
     part_name: str,
     part_number: str,
@@ -62,8 +62,12 @@ async def fetch_parts_deterministic(
     Keys: price_usd, purchase_url, stock_status, source_site, all_sources (list), excel_path
     """
     results = await _scrape_all_sources(
-        part_name, part_number, context_text,
-        brand=brand, model_number=model_number, appliance_type=appliance_type,
+        part_name,
+        part_number,
+        context_text,
+        brand=brand,
+        model_number=model_number,
+        appliance_type=appliance_type,
     )
     excel_path = save_parts_excel(results, part_name, part_number) or ""
 
@@ -77,18 +81,19 @@ async def fetch_parts_deterministic(
         best = results[0]
 
     return {
-        "price_usd":    best["price_usd"],
+        "price_usd": best["price_usd"],
         "purchase_url": best["purchase_url"],
         "stock_status": best["stock_status"],
-        "source_site":  best["source_site"],
-        "all_sources":  results,
-        "excel_path":   excel_path,
+        "source_site": best["source_site"],
+        "all_sources": results,
+        "excel_path": excel_path,
     }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Multi-source scraper
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _smart_search_term(part_name: str, part_number: str, brand: str = "") -> str:
     """Build a search term that includes brand context for better relevance.
@@ -102,7 +107,10 @@ def _smart_search_term(part_name: str, part_number: str, brand: str = "") -> str
 
 
 def _annotate_results(
-    results: list[dict], match_type: str, part_name: str, brand: str,
+    results: list[dict],
+    match_type: str,
+    part_name: str,
+    brand: str,
 ) -> list[dict]:
     """Add match_type and a suggestion comment to each result."""
     for r in results:
@@ -127,8 +135,12 @@ def _annotate_results(
 
 
 async def _scrape_all_sources(
-    part_name: str, part_number: str, context_text: str,
-    brand: str = "", model_number: str = "", appliance_type: str = "",
+    part_name: str,
+    part_number: str,
+    context_text: str,
+    brand: str = "",
+    model_number: str = "",
+    appliance_type: str = "",
 ) -> list[dict]:
     """Run all scrapers concurrently, then backfill with name+brand search."""
     settings = get_settings()
@@ -196,17 +208,20 @@ async def _scrape_all_sources(
     results = deduped
 
     # Sort: exact matches first, then by price; unpriced last
-    results.sort(key=lambda x: (
-        x.get("price_usd", 0) <= 0,
-        0 if x.get("match_type") == "exact" else 1,
-        x.get("price_usd", 0),
-    ))
+    results.sort(
+        key=lambda x: (
+            float(x.get("price_usd", 0) or 0) <= 0,  # type: ignore[arg-type]
+            0 if x.get("match_type") == "exact" else 1,
+            float(x.get("price_usd", 0) or 0),  # type: ignore[arg-type]
+        )
+    )
     return results[:20]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Individual site scrapers
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _page_has_part(html: str, part_number: str) -> bool:
     """
@@ -234,7 +249,8 @@ def _extract_json_ld_prices(
 
     for m in re.finditer(
         r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-        html, re.DOTALL | re.IGNORECASE,
+        html,
+        re.DOTALL | re.IGNORECASE,
     ):
         try:
             data = json.loads(m.group(1))
@@ -258,17 +274,25 @@ def _extract_json_ld_prices(
 
             # ── Validate this JSON-LD product is for our specific part ──────
             if pn_upper:
-                product_identity = " ".join(filter(None, [
-                    str(obj.get("name", "")),
-                    str(obj.get("sku", "")),
-                    str(obj.get("mpn", "")),
-                    str(obj.get("productID", "")),
-                    str(obj.get("identifier", "")),
-                    str(obj.get("gtin", "")),
-                ])).upper()
+                product_identity = " ".join(
+                    filter(
+                        None,
+                        [
+                            str(obj.get("name", "")),
+                            str(obj.get("sku", "")),
+                            str(obj.get("mpn", "")),
+                            str(obj.get("productID", "")),
+                            str(obj.get("identifier", "")),
+                            str(obj.get("gtin", "")),
+                        ],
+                    )
+                ).upper()
                 if pn_upper not in product_identity:
-                    log.debug("[json-ld] Skipping product '%s' — part number %s not found in identifiers",
-                              obj.get("name", "?")[:60], part_number)
+                    log.debug(
+                        "[json-ld] Skipping product '%s' — part number %s not found in identifiers",
+                        obj.get("name", "?")[:60],
+                        part_number,
+                    )
                     continue
 
             offers = obj.get("offers") or obj.get("Offers") or {}
@@ -284,16 +308,20 @@ def _extract_json_ld_prices(
                     p_url = offer.get("url") or obj.get("url") or fallback_url
                     avail = str(offer.get("availability", "")).lower()
                     stock = (
-                        "In Stock" if "instock" in avail
-                        else "Out of Stock" if "outofstock" in avail
+                        "In Stock"
+                        if "instock" in avail
+                        else "Out of Stock"
+                        if "outofstock" in avail
                         else "Check Vendor"
                     )
-                    results.append({
-                        "source_site":  site,
-                        "price_usd":    price,
-                        "purchase_url": p_url,
-                        "stock_status": stock,
-                    })
+                    results.append(
+                        {
+                            "source_site": site,
+                            "price_usd": price,
+                            "purchase_url": p_url,
+                            "stock_status": stock,
+                        }
+                    )
                 except (TypeError, ValueError):
                     continue
 
@@ -303,7 +331,7 @@ def _extract_json_ld_prices(
 async def _scrape_partselect(part_number: str, part_name: str, proxy: str | None) -> list[dict]:
     """
     PartSelect.com — routes through Bright Data proxy when available.
-    
+
     PartSelect returns 403 to direct bot requests. Even with proxy, if the search
     results redirect to a category page (not a specific part page), the part number
     won't appear on the page → we return a search link only (no false price).
@@ -312,8 +340,9 @@ async def _scrape_partselect(part_number: str, part_name: str, proxy: str | None
     try:
         if proxy:
             transport = httpx.AsyncHTTPTransport(proxy=httpx.Proxy(url=proxy), verify=False)
-            client = httpx.AsyncClient(transport=transport, headers=_HEADERS,
-                                       timeout=45.0, follow_redirects=True)
+            client = httpx.AsyncClient(
+                transport=transport, headers=_HEADERS, timeout=45.0, follow_redirects=True
+            )
         else:
             client = httpx.AsyncClient(headers=_HEADERS, timeout=20.0, follow_redirects=True)
         async with client as c:
@@ -346,11 +375,12 @@ async def _scrape_partselect(part_number: str, part_name: str, proxy: str | None
     if not results:
         # Find all occurrences of the part number on the page, look for nearby price
         for pn_m in re.finditer(re.escape(part_number), html, re.IGNORECASE):
-            window = html[max(0, pn_m.start() - 200): pn_m.start() + 600]
+            window = html[max(0, pn_m.start() - 200) : pn_m.start() + 600]
             price_m = re.search(
                 r'itemprop=["\']price["\'][^>]*content=["\']([0-9]+\.?[0-9]*)["\']'
                 r'|(?:class="[^"]*price[^"]*"|>\$)([0-9]+\.[0-9]{2})',
-                window, re.IGNORECASE,
+                window,
+                re.IGNORECASE,
             )
             if price_m:
                 try:
@@ -359,8 +389,14 @@ async def _scrape_partselect(part_number: str, part_name: str, proxy: str | None
                         url_m = re.search(r'href="(/[A-Za-z0-9\-]+-PS[0-9]+[^"]*)"', window)
                         part_url = ("https://www.partselect.com" + url_m.group(1)) if url_m else url
                         stock = "In Stock" if "In Stock" in window else "Check Vendor"
-                        results.append({"source_site": "partselect.com", "price_usd": price,
-                                        "purchase_url": part_url, "stock_status": stock})
+                        results.append(
+                            {
+                                "source_site": "partselect.com",
+                                "price_usd": price,
+                                "purchase_url": part_url,
+                                "stock_status": stock,
+                            }
+                        )
                         break
                 except (TypeError, ValueError):
                     continue
@@ -393,30 +429,45 @@ async def _scrape_appliancepartspros(part_number: str, part_name: str) -> list[d
     # 2 — dollar-regex near the part number occurrence
     if not results:
         for pn_m in re.finditer(re.escape(part_number), html, re.IGNORECASE):
-            window = html[max(0, pn_m.start() - 100): pn_m.start() + 800]
-            price_m = re.search(r'\$([0-9]+\.[0-9]{2})', window)
+            window = html[max(0, pn_m.start() - 100) : pn_m.start() + 800]
+            price_m = re.search(r"\$([0-9]+\.[0-9]{2})", window)
             if price_m:
                 try:
                     price = float(price_m.group(1))
                     if 5 < price < 2000:
                         stock = "In Stock" if "Add to Cart" in window else "Check Vendor"
-                        results.append({"source_site": "appliancepartspros.com",
-                                        "price_usd": price, "purchase_url": url,
-                                        "stock_status": stock})
+                        results.append(
+                            {
+                                "source_site": "appliancepartspros.com",
+                                "price_usd": price,
+                                "purchase_url": url,
+                                "stock_status": stock,
+                            }
+                        )
                         break
                 except (TypeError, ValueError):
                     continue
 
     # 3 — first dollar amount on page (last resort — APP usually redirects to exact part)
     if not results:
-        for m in re.finditer(r'\$([0-9]+\.[0-9]{2})', html):
+        for m in re.finditer(r"\$([0-9]+\.[0-9]{2})", html):
             try:
                 price = float(m.group(1))
                 if price < 5 or price > 2000:
                     continue
-                stock = "In Stock" if "Add to Cart" in html[max(0, m.start()-300):m.start()+300] else "Check Vendor"
-                results.append({"source_site": "appliancepartspros.com", "price_usd": price,
-                                 "purchase_url": url, "stock_status": stock})
+                stock = (
+                    "In Stock"
+                    if "Add to Cart" in html[max(0, m.start() - 300) : m.start() + 300]
+                    else "Check Vendor"
+                )
+                results.append(
+                    {
+                        "source_site": "appliancepartspros.com",
+                        "price_usd": price,
+                        "purchase_url": url,
+                        "stock_status": stock,
+                    }
+                )
                 break
             except (TypeError, ValueError):
                 continue
@@ -438,15 +489,13 @@ async def _scrape_ebay(part_number: str, part_name: str, proxy: str | None = Non
         search_term = part_name
     else:
         search_term = f"{part_number} {part_name}".strip()
-    url = (
-        f"https://www.ebay.com/sch/i.html"
-        f"?_nkw={quote(search_term)}&LH_BIN=1&_sop=15"
-    )
+    url = f"https://www.ebay.com/sch/i.html?_nkw={quote(search_term)}&LH_BIN=1&_sop=15"
     try:
         if proxy:
             transport = httpx.AsyncHTTPTransport(proxy=httpx.Proxy(url=proxy), verify=False)
-            client = httpx.AsyncClient(transport=transport, headers=_HEADERS,
-                                       timeout=45.0, follow_redirects=True)
+            client = httpx.AsyncClient(
+                transport=transport, headers=_HEADERS, timeout=45.0, follow_redirects=True
+            )
         else:
             client = httpx.AsyncClient(headers=_HEADERS, timeout=20.0, follow_redirects=True)
         async with client as c:
@@ -463,8 +512,11 @@ async def _scrape_ebay(part_number: str, part_name: str, proxy: str | None = Non
     # real listings, just random page furniture with dollar signs that
     # the regex would pick up as fake prices.
     if "splashui/challenge" in final_url or "captcha" in html.lower():
-        log.warning("[eBay] Bot challenge detected (redirected to %s) — "
-                    "returning search link instead of fake prices.", final_url[:80])
+        log.warning(
+            "[eBay] Bot challenge detected (redirected to %s) — "
+            "returning search link instead of fake prices.",
+            final_url[:80],
+        )
         return [_link_stub(part_number, part_name, "ebay.com", url)]
 
     if not _page_has_part(html, part_number):
@@ -480,26 +532,28 @@ async def _scrape_ebay(part_number: str, part_name: str, proxy: str | None = Non
     if not results:
         for pn_m in re.finditer(re.escape(part_number), html, re.IGNORECASE):
             # Expand context: eBay item blocks can be 2-3kb
-            window = html[max(0, pn_m.start() - 1500): pn_m.start() + 500]
+            window = html[max(0, pn_m.start() - 1500) : pn_m.start() + 500]
             # Look for price span
             price_m = re.search(
                 r'class="s-item__price"[^>]*>\s*(?:US )?\$([0-9]+(?:\.[0-9]+)?)'
                 r'|"US \$([0-9]+\.[0-9]{2})"'
-                r'|(?:US )?\$([0-9]+\.[0-9]{2})',
+                r"|(?:US )?\$([0-9]+\.[0-9]{2})",
                 window,
             )
             if price_m:
                 try:
-                    price = float(
-                        price_m.group(1) or price_m.group(2) or price_m.group(3)
-                    )
+                    price = float(price_m.group(1) or price_m.group(2) or price_m.group(3))
                     if 5 < price < 2000:
-                        url_m = re.search(
-                            r'href="(https://www\.ebay\.com/itm/[^"?]+)', window
-                        )
+                        url_m = re.search(r'href="(https://www\.ebay\.com/itm/[^"?]+)', window)
                         item_url = url_m.group(1) if url_m else url
-                        results.append({"source_site": "ebay.com", "price_usd": price,
-                                        "purchase_url": item_url, "stock_status": "Buy It Now"})
+                        results.append(
+                            {
+                                "source_site": "ebay.com",
+                                "price_usd": price,
+                                "purchase_url": item_url,
+                                "stock_status": "Buy It Now",
+                            }
+                        )
                         if len(results) >= 8:
                             break
                 except (TypeError, ValueError):
@@ -507,20 +561,24 @@ async def _scrape_ebay(part_number: str, part_name: str, proxy: str | None = Non
 
     # 3 — s-item__price spans (picks up correctly ordered results)
     if not results:
-        for m in re.finditer(
-            r'class="s-item__price">\s*(?:US )?\$([0-9]+(?:\.[0-9]+)?)', html
-        ):
+        for m in re.finditer(r'class="s-item__price">\s*(?:US )?\$([0-9]+(?:\.[0-9]+)?)', html):
             try:
                 price = float(m.group(1))
                 if price < 5 or price > 2000:
                     continue
-                nearby = html[max(0, m.start() - 1500): m.start()]
+                nearby = html[max(0, m.start() - 1500) : m.start()]
                 if part_number.upper() not in nearby.upper():
                     continue
                 url_m = re.search(r'href="(https://www\.ebay\.com/itm/[^"?]+)', nearby)
                 item_url = url_m.group(1) if url_m else url
-                results.append({"source_site": "ebay.com", "price_usd": price,
-                                 "purchase_url": item_url, "stock_status": "Buy It Now"})
+                results.append(
+                    {
+                        "source_site": "ebay.com",
+                        "price_usd": price,
+                        "purchase_url": item_url,
+                        "stock_status": "Buy It Now",
+                    }
+                )
                 if len(results) >= 8:
                     break
             except (TypeError, ValueError):
@@ -560,11 +618,12 @@ async def _scrape_applianceparts365(part_number: str, part_name: str) -> list[di
     # 2 — price near part number, preferring sale/actual price over strikethrough
     if not results:
         for pn_m in re.finditer(re.escape(part_number), html, re.IGNORECASE):
-            window = html[max(0, pn_m.start() - 100): pn_m.start() + 800]
+            window = html[max(0, pn_m.start() - 100) : pn_m.start() + 800]
 
             # Find ALL dollar amounts in the window
             all_prices = [
-                float(m.group(1)) for m in re.finditer(r'\$([0-9]+\.[0-9]{2})', window)
+                float(m.group(1))
+                for m in re.finditer(r"\$([0-9]+\.[0-9]{2})", window)
                 if 5 < float(m.group(1)) < 2000
             ]
             if not all_prices:
@@ -577,12 +636,18 @@ async def _scrape_applianceparts365(part_number: str, part_name: str) -> list[di
             stock = "In Stock" if "Add to Cart" in window or "Buy" in window else "Check Vendor"
             url_m = re.search(
                 r'href="(/[^"]+' + re.escape(part_number.lower()) + r'[^"]*)"',
-                window, re.IGNORECASE,
+                window,
+                re.IGNORECASE,
             )
             part_url = ("https://applianceparts365.com" + url_m.group(1)) if url_m else url
-            results.append({"source_site": "applianceparts365.com",
-                            "price_usd": price, "purchase_url": part_url,
-                            "stock_status": stock})
+            results.append(
+                {
+                    "source_site": "applianceparts365.com",
+                    "price_usd": price,
+                    "purchase_url": part_url,
+                    "stock_status": stock,
+                }
+            )
             break
 
     if not results:
@@ -599,31 +664,52 @@ async def _scrape_amazon(part_number: str, part_name: str, proxy: str | None) ->
     and JSON-LD structured data embedded on search result pages.
     """
     # Build search term: avoid duplicating part_number if it's already in part_name
-    amz_search = f"{part_number} {part_name}" if part_number.upper() not in part_name.upper() else part_name
+    amz_search = (
+        f"{part_number} {part_name}" if part_number.upper() not in part_name.upper() else part_name
+    )
     url = f"https://www.amazon.com/s?k={quote(amz_search.strip())}"
 
     if not proxy:
         # Direct access always fails — just give a valid search link
-        return [{"source_site": "amazon.com", "price_usd": 0.0,
-                 "purchase_url": url, "stock_status": "Click to check price"}]
+        return [
+            {
+                "source_site": "amazon.com",
+                "price_usd": 0.0,
+                "purchase_url": url,
+                "stock_status": "Click to check price",
+            }
+        ]
 
     log.info("Bright Data → Amazon: %s", url)
     try:
         transport = httpx.AsyncHTTPTransport(proxy=httpx.Proxy(url=proxy), verify=False)
-        async with httpx.AsyncClient(transport=transport, headers=_HEADERS,
-                                     timeout=60.0, follow_redirects=True) as c:
+        async with httpx.AsyncClient(
+            transport=transport, headers=_HEADERS, timeout=60.0, follow_redirects=True
+        ) as c:
             r = await c.get(url)
             r.raise_for_status()
             html = r.text
     except Exception as e:
         log.warning("Amazon via Bright Data failed: %s — returning search link", e)
-        return [{"source_site": "amazon.com", "price_usd": 0.0,
-                 "purchase_url": url, "stock_status": "Click to check price"}]
+        return [
+            {
+                "source_site": "amazon.com",
+                "price_usd": 0.0,
+                "purchase_url": url,
+                "stock_status": "Click to check price",
+            }
+        ]
 
     if not _page_has_part(html, part_number):
         log.debug("[Amazon] Part %s not in search results", part_number)
-        return [{"source_site": "amazon.com", "price_usd": 0.0,
-                 "purchase_url": url, "stock_status": "Click to check price"}]
+        return [
+            {
+                "source_site": "amazon.com",
+                "price_usd": 0.0,
+                "purchase_url": url,
+                "stock_status": "Click to check price",
+            }
+        ]
 
     results = []
 
@@ -634,21 +720,24 @@ async def _scrape_amazon(part_number: str, part_name: str, proxy: str | None) ->
     # Format: <span class="a-offscreen">$XX.XX</span> inside a-price container
     if not results:
         for pn_m in re.finditer(re.escape(part_number), html, re.IGNORECASE):
-            window = html[max(0, pn_m.start() - 2000): pn_m.start() + 2000]
+            window = html[max(0, pn_m.start() - 2000) : pn_m.start() + 2000]
             # a-offscreen is the cleanest price signal on Amazon
-            price_m = re.search(
-                r'class="a-offscreen">\s*\$([0-9]+(?:\.[0-9]+)?)', window
-            )
+            price_m = re.search(r'class="a-offscreen">\s*\$([0-9]+(?:\.[0-9]+)?)', window)
             if price_m:
                 try:
                     price = float(price_m.group(1))
                     if 5 < price < 2000:
                         # Find the ASIN-based product URL
-                        asin_m = re.search(r'/dp/([A-Z0-9]{10})', window)
-                        item_url = (f"https://www.amazon.com/dp/{asin_m.group(1)}"
-                                    if asin_m else url)
-                        results.append({"source_site": "amazon.com", "price_usd": price,
-                                        "purchase_url": item_url, "stock_status": "In Stock"})
+                        asin_m = re.search(r"/dp/([A-Z0-9]{10})", window)
+                        item_url = f"https://www.amazon.com/dp/{asin_m.group(1)}" if asin_m else url
+                        results.append(
+                            {
+                                "source_site": "amazon.com",
+                                "price_usd": price,
+                                "purchase_url": item_url,
+                                "stock_status": "In Stock",
+                            }
+                        )
                         if len(results) >= 8:
                             break
                 except (TypeError, ValueError):
@@ -660,22 +749,33 @@ async def _scrape_amazon(part_number: str, part_name: str, proxy: str | None) ->
             try:
                 price = float(m.group(1))
                 if 5 < price < 2000:
-                    nearby = html[max(0, m.start() - 2000): m.start() + 500]
+                    nearby = html[max(0, m.start() - 2000) : m.start() + 500]
                     if part_number.upper() not in nearby.upper():
                         continue
-                    asin_m = re.search(r'/dp/([A-Z0-9]{10})', nearby)
-                    item_url = (f"https://www.amazon.com/dp/{asin_m.group(1)}"
-                                if asin_m else url)
-                    results.append({"source_site": "amazon.com", "price_usd": price,
-                                    "purchase_url": item_url, "stock_status": "In Stock"})
+                    asin_m = re.search(r"/dp/([A-Z0-9]{10})", nearby)
+                    item_url = f"https://www.amazon.com/dp/{asin_m.group(1)}" if asin_m else url
+                    results.append(
+                        {
+                            "source_site": "amazon.com",
+                            "price_usd": price,
+                            "purchase_url": item_url,
+                            "stock_status": "In Stock",
+                        }
+                    )
                     if len(results) >= 8:
                         break
             except (TypeError, ValueError):
                 continue
 
     if not results:
-        results = [{"source_site": "amazon.com", "price_usd": 0.0,
-                    "purchase_url": url, "stock_status": "Click to check price"}]
+        results = [
+            {
+                "source_site": "amazon.com",
+                "price_usd": 0.0,
+                "purchase_url": url,
+                "stock_status": "Click to check price",
+            }
+        ]
     return results[:8]
 
 
@@ -691,43 +791,71 @@ async def _scrape_repairclinic(part_number: str, part_name: str, proxy: str | No
     search_url = f"https://www.repairclinic.com/Shop-For-Parts?SearchTerm={quote(part_number)}"
 
     if not proxy:
-        return [{
-            "source_site":  "repairclinic.com",
-            "price_usd":    0.0,
-            "purchase_url": search_url,
-            "stock_status": "Click to check price",
-        }]
+        return [
+            {
+                "source_site": "repairclinic.com",
+                "price_usd": 0.0,
+                "purchase_url": search_url,
+                "stock_status": "Click to check price",
+            }
+        ]
 
     log.info("Bright Data → RepairClinic: %s", search_url)
     try:
         transport = httpx.AsyncHTTPTransport(proxy=httpx.Proxy(url=proxy), verify=False)
-        async with httpx.AsyncClient(transport=transport, headers=_HEADERS, timeout=60.0,
-                                     follow_redirects=True) as c:
+        async with httpx.AsyncClient(
+            transport=transport, headers=_HEADERS, timeout=60.0, follow_redirects=True
+        ) as c:
             r = await c.get(search_url)
             r.raise_for_status()
             html = r.text
     except Exception as e:
         log.warning("RepairClinic via Bright Data failed: %s — returning search link", e)
-        return [{"source_site": "repairclinic.com", "price_usd": 0.0,
-                 "purchase_url": search_url, "stock_status": "Visit site for pricing"}]
+        return [
+            {
+                "source_site": "repairclinic.com",
+                "price_usd": 0.0,
+                "purchase_url": search_url,
+                "stock_status": "Visit site for pricing",
+            }
+        ]
 
     # Gate 1: part number must appear on the page (not just in the search bar)
     if not _page_has_part(html, part_number):
-        log.warning("[RepairClinic] Part %s not found in rendered HTML — "
-                    "page may be a generic catalog browse. Returning search link.", part_number)
-        return [{"source_site": "repairclinic.com", "price_usd": 0.0,
-                 "purchase_url": search_url, "stock_status": "Visit site for pricing"}]
+        log.warning(
+            "[RepairClinic] Part %s not found in rendered HTML — "
+            "page may be a generic catalog browse. Returning search link.",
+            part_number,
+        )
+        return [
+            {
+                "source_site": "repairclinic.com",
+                "price_usd": 0.0,
+                "purchase_url": search_url,
+                "stock_status": "Visit site for pricing",
+            }
+        ]
 
     # Gate 2: detect garbage catalog pages — if result count is huge, the search
     # didn't match a specific part (e.g., "261,597 results" = generic browse)
-    result_count_m = re.search(r'([\d,]+)\s+results?', html)
+    result_count_m = re.search(r"([\d,]+)\s+results?", html)
     if result_count_m:
         count = int(result_count_m.group(1).replace(",", ""))
         if count > 100:
-            log.warning("[RepairClinic] Search returned %d results for %s — too broad, "
-                        "not a specific part match. Returning search link.", count, part_number)
-            return [{"source_site": "repairclinic.com", "price_usd": 0.0,
-                     "purchase_url": search_url, "stock_status": "Visit site for pricing"}]
+            log.warning(
+                "[RepairClinic] Search returned %d results for %s — too broad, "
+                "not a specific part match. Returning search link.",
+                count,
+                part_number,
+            )
+            return [
+                {
+                    "source_site": "repairclinic.com",
+                    "price_usd": 0.0,
+                    "purchase_url": search_url,
+                    "stock_status": "Visit site for pricing",
+                }
+            ]
 
     # 1 — JSON-LD with part-number validation (prevents rack adjuster / wrong-part matches)
     results = _extract_json_ld_prices(html, "repairclinic.com", search_url, part_number)
@@ -735,19 +863,23 @@ async def _scrape_repairclinic(part_number: str, part_name: str, proxy: str | No
     # 2 — data-price attribute near part number
     if not results:
         for pn_m in re.finditer(re.escape(part_number), html, re.IGNORECASE):
-            window = html[max(0, pn_m.start() - 300): pn_m.start() + 800]
+            window = html[max(0, pn_m.start() - 300) : pn_m.start() + 800]
             dp_m = re.search(
                 r'data-price="([0-9]+(?:\.[0-9]+)?)"[^>]*href="([^"]+repairclinic[^"]+)"',
                 window,
             )
             if dp_m:
                 try:
-                    results.append({
-                        "source_site":  "repairclinic.com",
-                        "price_usd":    float(dp_m.group(1)),
-                        "purchase_url": dp_m.group(2),
-                        "stock_status": "In Stock" if "Add to Cart" in window else "Check Vendor",
-                    })
+                    results.append(
+                        {
+                            "source_site": "repairclinic.com",
+                            "price_usd": float(dp_m.group(1)),
+                            "purchase_url": dp_m.group(2),
+                            "stock_status": "In Stock"
+                            if "Add to Cart" in window
+                            else "Check Vendor",
+                        }
+                    )
                     break
                 except ValueError:
                     continue
@@ -755,27 +887,40 @@ async def _scrape_repairclinic(part_number: str, part_name: str, proxy: str | No
     # 3 — dollar amount near part number
     if not results:
         for pn_m in re.finditer(re.escape(part_number), html, re.IGNORECASE):
-            window = html[max(0, pn_m.start() - 100): pn_m.start() + 600]
-            price_m = re.search(r'\$([0-9]+\.[0-9]{2})', window)
+            window = html[max(0, pn_m.start() - 100) : pn_m.start() + 600]
+            price_m = re.search(r"\$([0-9]+\.[0-9]{2})", window)
             if price_m:
                 try:
                     price = float(price_m.group(1))
                     if 5 < price < 2000:
-                        results.append({"source_site": "repairclinic.com", "price_usd": price,
-                                        "purchase_url": search_url, "stock_status": "Check Vendor"})
+                        results.append(
+                            {
+                                "source_site": "repairclinic.com",
+                                "price_usd": price,
+                                "purchase_url": search_url,
+                                "stock_status": "Check Vendor",
+                            }
+                        )
                         break
                 except (TypeError, ValueError):
                     continue
 
     if not results:
-        results = [{"source_site": "repairclinic.com", "price_usd": 0.0,
-                    "purchase_url": search_url, "stock_status": "Visit site for pricing"}]
+        results = [
+            {
+                "source_site": "repairclinic.com",
+                "price_usd": 0.0,
+                "purchase_url": search_url,
+                "stock_status": "Visit site for pricing",
+            }
+        ]
     return results[:3]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Excel export
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def save_parts_excel(results: list[dict], part_name: str, part_number: str) -> str | None:
     """Save results to an Excel file in reports/. Returns the file path."""
@@ -796,8 +941,15 @@ def save_parts_excel(results: list[dict], part_name: str, part_number: str) -> s
     ws = wb.active
     ws.title = "Parts Price Comparison"
 
-    headers = ["Rank", "Source", "Price (USD)", "Stock Status",
-               "Match Type", "Agent Suggestion", "Buy URL"]
+    headers = [
+        "Rank",
+        "Source",
+        "Price (USD)",
+        "Stock Status",
+        "Match Type",
+        "Agent Suggestion",
+        "Buy URL",
+    ]
     header_fill = PatternFill("solid", fgColor="1F4E79")
     header_font = Font(bold=True, color="FFFFFF")
     for col, h in enumerate(headers, 1):
@@ -812,9 +964,9 @@ def save_parts_excel(results: list[dict], part_name: str, part_number: str) -> s
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
     ws.cell(row=1, column=1).alignment = Alignment(horizontal="center")
 
-    best_fill     = PatternFill("solid", fgColor="E2EFDA")
-    exact_fill    = PatternFill("solid", fgColor="FFFFFF")
-    compat_fill   = PatternFill("solid", fgColor="FFF2CC")
+    best_fill = PatternFill("solid", fgColor="E2EFDA")
+    exact_fill = PatternFill("solid", fgColor="FFFFFF")
+    compat_fill = PatternFill("solid", fgColor="FFF2CC")
 
     for i, src in enumerate(results, 1):
         row = i + 2
@@ -856,23 +1008,30 @@ def save_parts_excel(results: list[dict], part_name: str, part_number: str) -> s
 # Stub helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _make_stub(part_number: str, part_name: str) -> dict:
-    return _link_stub(part_number, part_name, "partselect.com",
-                      f"https://www.partselect.com/Search.aspx?SearchTerm={quote(part_number)}")
+    return _link_stub(
+        part_number,
+        part_name,
+        "partselect.com",
+        f"https://www.partselect.com/Search.aspx?SearchTerm={quote(part_number)}",
+    )
 
 
 def _link_stub(part_number: str, part_name: str, site: str, url: str) -> dict:
     return {
-        "source_site":  site,
-        "price_usd":    0.0,
+        "source_site": site,
+        "price_usd": 0.0,
         "purchase_url": url,
         "stock_status": "Click to check price",
-        "match_type":   "exact",
-        "suggestion":   f"Visit {site} to check price and availability",
+        "match_type": "exact",
+        "suggestion": f"Visit {site} to check price and availability",
     }
 
 
 # Back-compat shim
-async def fetch_part_price_and_url(part_number: str, appliance_hint: str = "") -> tuple[float, str, str]:
+async def fetch_part_price_and_url(
+    part_number: str, appliance_hint: str = ""
+) -> tuple[float, str, str]:
     d = await fetch_parts_deterministic(part_number, part_number, appliance_hint)
     return float(d["price_usd"]), str(d["purchase_url"]), str(d["stock_status"])

@@ -27,24 +27,23 @@ def format_diagnostic_markdown(
     parts   : price_usd, purchase_url, stock_status, source_site, all_sources, excel_path
     tutorial: video_url, video_title, duration_seconds
     """
-    part_name    = vision.get("part_name") or "Unknown part"
-    part_number  = vision.get("part_number") or "N/A"
-    labor        = float(vision.get("estimated_labor_cost") or 0.0)
-    confidence   = vision.get("confidence")
+    part_name = vision.get("part_name") or "Unknown part"
+    part_number = vision.get("part_number") or "N/A"
+    labor = float(vision.get("estimated_labor_cost") or 0.0)
+    confidence = vision.get("confidence")
     issue_summary = (vision.get("issue_summary") or "").strip()
 
-    price        = float(parts.get("price_usd") or 0.0)
+    price = float(parts.get("price_usd") or 0.0)
     purchase_url = parts.get("purchase_url") or "#"
-    stock_status = parts.get("stock_status") or "check vendor"
-    source_site  = parts.get("source_site") or "vendor"
-    all_sources  = parts.get("all_sources") or []
-    excel_path   = parts.get("excel_path") or ""
+    source_site = parts.get("source_site") or "vendor"
+    all_sources = parts.get("all_sources") or []
+    excel_path = parts.get("excel_path") or ""
 
-    video_url   = tutorial.get("video_url") or "#"
+    video_url = tutorial.get("video_url") or "#"
     video_title = tutorial.get("video_title") or "Tutorial"
-    dur_s       = int(tutorial.get("duration_seconds") or 0)
+    dur_s = int(tutorial.get("duration_seconds") or 0)
 
-    savings      = labor - price
+    savings = labor - price
     savings_sign = "+" if savings >= 0 else ""
 
     # ── Confidence badge ────────────────────────────────────────────────────
@@ -64,7 +63,7 @@ def format_diagnostic_markdown(
     # ── Duration display ────────────────────────────────────────────────────
     if dur_s:
         minutes, secs = divmod(dur_s, 60)
-        dur_label   = f"{minutes}m {secs}s" if minutes else f"{secs}s"
+        dur_label = f"{minutes}m {secs}s" if minutes else f"{secs}s"
         dur_display = f" · {dur_label}"
     else:
         dur_display = ""
@@ -88,6 +87,7 @@ def format_diagnostic_markdown(
     excel_note = ""
     if excel_path:
         import os
+
         fname = os.path.basename(excel_path)
         reports_base = os.getenv("REPORTS_BASE_URL", "http://localhost:8080")
         download_url = f"{reports_base.rstrip('/')}/{fname}"
@@ -134,7 +134,10 @@ This is an AI-generated estimate, not a guaranteed quote.*
 
 
 def _build_recommendation(
-    all_sources: list, best_price: float, best_site: str, labor: float,
+    all_sources: list,
+    best_price: float,
+    best_site: str,
+    labor: float,
 ) -> str:
     """Build a concise recommendation based on the parts agent's findings."""
     if not all_sources or best_price <= 0:
@@ -198,31 +201,35 @@ def _build_sources_table(
         if isinstance(s, dict):
             return s
         return {
-            "source_site":  getattr(s, "source_site", ""),
-            "price_usd":    getattr(s, "price_usd", 0.0),
+            "source_site": getattr(s, "source_site", ""),
+            "price_usd": getattr(s, "price_usd", 0.0),
             "purchase_url": getattr(s, "purchase_url", ""),
             "stock_status": getattr(s, "stock_status", ""),
-            "match_type":   getattr(s, "match_type", "exact"),
-            "suggestion":   getattr(s, "suggestion", ""),
+            "match_type": getattr(s, "match_type", "exact"),
+            "suggestion": getattr(s, "suggestion", ""),
         }
 
     rows = [_as_dict(s) for s in all_sources]
 
     if not rows:
-        rows = [{
-            "source_site":  best_site,
-            "price_usd":    best_price,
-            "purchase_url": best_url,
-            "stock_status": "Check Vendor",
-            "match_type":   "exact",
-            "suggestion":   "",
-        }]
+        rows = [
+            {
+                "source_site": best_site,
+                "price_usd": best_price,
+                "purchase_url": best_url,
+                "stock_status": "Check Vendor",
+                "match_type": "exact",
+                "suggestion": "",
+            }
+        ]
 
-    rows.sort(key=lambda r: (
-        r.get("price_usd", 0) <= 0,
-        0 if r.get("match_type") == "exact" else 1,
-        r.get("price_usd", 0),
-    ))
+    rows.sort(
+        key=lambda r: (
+            r.get("price_usd", 0) <= 0,
+            0 if r.get("match_type") == "exact" else 1,
+            r.get("price_usd", 0),
+        )
+    )
     rows = rows[:15]
 
     lines = [
@@ -231,11 +238,11 @@ def _build_sources_table(
         "| :- | :---- | ----: | :--- | :---- | :--- |",
     ]
     for i, r in enumerate(rows, 1):
-        p     = r.get("price_usd") or 0.0
-        url   = r.get("purchase_url") or "#"
-        site  = r.get("source_site") or "vendor"
+        p = r.get("price_usd") or 0.0
+        url = r.get("purchase_url") or "#"
+        site = r.get("source_site") or "vendor"
         stock = r.get("stock_status") or "Check Vendor"
-        mt    = r.get("match_type", "exact")
+        mt = r.get("match_type", "exact")
         mt_label = "✅ Exact" if mt == "exact" else "🔄 Compat."
 
         if i == 1 and p > 0:

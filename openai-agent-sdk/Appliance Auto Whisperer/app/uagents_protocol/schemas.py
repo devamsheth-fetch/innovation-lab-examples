@@ -12,6 +12,7 @@ from uagents import Model
 
 class PartsSourcingRequest(Model):
     """Orchestrator → parts worker."""
+
     part_name: str
     part_number: str
     context_text: str
@@ -23,6 +24,7 @@ class PartsSourcingRequest(Model):
 
 class PartSource(Model):
     """Single price source returned inside PartsSourcingResponse."""
+
     source_site: str
     price_usd: float
     purchase_url: str
@@ -43,6 +45,7 @@ class PartsSourcingResponse(Model):
 
 class TutorialSearchRequest(Model):
     """Orchestrator → tutorial worker."""
+
     search_query: str
     part_name: str = ""
     brand: str = ""
