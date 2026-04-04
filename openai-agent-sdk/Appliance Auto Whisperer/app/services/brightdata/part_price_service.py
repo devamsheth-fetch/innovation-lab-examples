@@ -167,7 +167,7 @@ def _page_has_part(html: str, part_number: str) -> bool:
     category/catalog browse pages (e.g. RepairClinic's 298k-result pages).
     """
     if not part_number or not part_number.strip():
-        return False
+        return True
     return part_number.upper() in html.upper()
 
 
