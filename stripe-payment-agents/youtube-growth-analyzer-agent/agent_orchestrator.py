@@ -600,7 +600,7 @@ async def on_commit(ctx: Context, sender: str, msg: CommitPayment) -> None:
             else:
                 text = f"**(Premium report continued {i + 1}/{total})**\n\n{chunk}"
             await ctx.send(sender, make_chat(text))
-    except Exception as e:
+    except Exception:
         logger.exception("Failed sending premium report chunk %d/%d", i + 1, total)
         try:
             await ctx.send(
