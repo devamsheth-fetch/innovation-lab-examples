@@ -86,13 +86,19 @@ class PremiumReport(BaseModel):
     content_pattern_analysis: str
     top_performing_video_patterns: str
     growth_weaknesses: str
-    actionable_recommendations: list[str] = Field(default_factory=list, min_length=7, max_length=10)
-    suggested_content_pillars: list[str] = Field(default_factory=list, min_length=3, max_length=6)
+    actionable_recommendations: list[str] = Field(
+        default_factory=list, min_length=7, max_length=10
+    )
+    suggested_content_pillars: list[str] = Field(
+        default_factory=list, min_length=3, max_length=6
+    )
     suggested_posting_cadence: str
     final_growth_strategy_summary: str
 
     def to_markdown(self) -> str:
-        recs = "\n".join(f"{i}. {r}" for i, r in enumerate(self.actionable_recommendations, start=1))
+        recs = "\n".join(
+            f"{i}. {r}" for i, r in enumerate(self.actionable_recommendations, start=1)
+        )
         pillars = "\n".join(f"- {p}" for p in self.suggested_content_pillars)
         parts = [
             "## Channel overview",
@@ -134,7 +140,9 @@ class PaymentActionPayload(BaseModel):
     The canonical payment rail payload is still AgentPayment `RequestPayment.metadata['stripe']`.
     """
 
-    type: str = Field(default="stripe_embedded_checkout", description="Payment UX action type.")
+    type: str = Field(
+        default="stripe_embedded_checkout", description="Payment UX action type."
+    )
     amount_usd: str = "5.00"
     currency: str = "USD"
     label: str = "Pay $5 for full report"

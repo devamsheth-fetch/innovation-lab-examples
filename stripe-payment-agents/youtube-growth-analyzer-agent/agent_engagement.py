@@ -55,7 +55,12 @@ def analyze_engagement(snapshot: ChannelSnapshot) -> EngagementMetrics:
 
     rates: list[float] = []
     for v in videos:
-        if v.view_count and v.view_count > 0 and v.like_count is not None and v.comment_count is not None:
+        if (
+            v.view_count
+            and v.view_count > 0
+            and v.like_count is not None
+            and v.comment_count is not None
+        ):
             eng = (v.like_count + v.comment_count) / v.view_count
             rates.append(eng)
     avg_eng = float(sum(rates) / len(rates)) if rates else None

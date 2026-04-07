@@ -106,7 +106,9 @@ def _yt_get(client: httpx.Client, path: str, params: dict[str, Any]) -> dict[str
     return r.json()
 
 
-def resolve_channel_id(client: httpx.Client, query: str) -> tuple[str | None, YouTubeResolutionError | None]:
+def resolve_channel_id(
+    client: httpx.Client, query: str
+) -> tuple[str | None, YouTubeResolutionError | None]:
     """
     Resolve a channel id from a user-provided URL, handle, or search string.
     """
@@ -148,7 +150,9 @@ def resolve_channel_id(client: httpx.Client, query: str) -> tuple[str | None, Yo
         )
 
 
-def fetch_channel_snapshot(channel_id: str) -> tuple[ChannelSnapshot | None, YouTubeResolutionError | None]:
+def fetch_channel_snapshot(
+    channel_id: str,
+) -> tuple[ChannelSnapshot | None, YouTubeResolutionError | None]:
     """Fetch channel metadata, uploads playlist, and recent video statistics."""
     with httpx.Client() as client:
         try:
@@ -189,17 +193,11 @@ def fetch_channel_snapshot(channel_id: str) -> tuple[ChannelSnapshot | None, You
             )
             pl_items = pl.get("items") or []
             video_ids: list[str] = []
-            published_times: list[tuple[str, str]] = []
             for row in pl_items:
                 vid = (row.get("contentDetails") or {}).get("videoId")
                 if not vid:
                     continue
                 video_ids.append(vid)
-                title = ((row.get("snippet") or {}).get("title")) or ""
-                published = (row.get("contentDetails") or {}).get("videoPublishedAt") or (
-                    row.get("snippet") or {}
-                ).get("publishedAt")
-                published_times.append((vid, published or ""))
 
             videos: list[VideoSnippet] = []
             # Batch videos.list in chunks
@@ -220,7 +218,9 @@ def fetch_channel_snapshot(channel_id: str) -> tuple[ChannelSnapshot | None, You
                     pub = _parse_rfc3339(sn.get("publishedAt"))
                     views = int(st["viewCount"]) if st.get("viewCount") else None
                     likes = int(st["likeCount"]) if st.get("likeCount") else None
-                    comments = int(st["commentCount"]) if st.get("commentCount") else None
+                    comments = (
+                        int(st["commentCount"]) if st.get("commentCount") else None
+                    )
                     videos.append(
                         VideoSnippet(
                             video_id=vid,
@@ -232,18 +232,24 @@ def fetch_channel_snapshot(channel_id: str) -> tuple[ChannelSnapshot | None, You
                         )
                     )
 
-            subs = int(stats["subscriberCount"]) if stats.get("subscriberCount") else None
+            subs = (
+                int(stats["subscriberCount"]) if stats.get("subscriberCount") else None
+            )
             snapshot = ChannelSnapshot(
                 channel_id=channel_id,
                 title=snip.get("title") or "Unknown channel",
                 description=snip.get("description") or "",
                 custom_url=snip.get("customUrl"),
                 subscriber_count=subs,
-                video_count=int(stats["videoCount"]) if stats.get("videoCount") else None,
+                video_count=int(stats["videoCount"])
+                if stats.get("videoCount")
+                else None,
                 view_count=int(stats["viewCount"]) if stats.get("viewCount") else None,
                 country=snip.get("country"),
                 published_at=_parse_rfc3339(snip.get("publishedAt")),
-                recent_videos=sorted(videos, key=lambda x: x.published_at, reverse=True),
+                recent_videos=sorted(
+                    videos, key=lambda x: x.published_at, reverse=True
+                ),
                 raw_channel_response=it,
             )
             return snapshot, None
@@ -261,7 +267,9 @@ def fetch_channel_snapshot(channel_id: str) -> tuple[ChannelSnapshot | None, You
             )
 
 
-def resolve_and_fetch(user_query: str) -> tuple[ChannelSnapshot | None, YouTubeResolutionError | None]:
+def resolve_and_fetch(
+    user_query: str,
+) -> tuple[ChannelSnapshot | None, YouTubeResolutionError | None]:
     """
     End-to-end: parse user text, resolve channel id, return `ChannelSnapshot` or error.
     """
@@ -275,6 +283,8 @@ def resolve_and_fetch(user_query: str) -> tuple[ChannelSnapshot | None, YouTubeR
     with httpx.Client() as client:
         cid, err = resolve_channel_id(client, q)
         if err or not cid:
-            return None, err or YouTubeResolutionError(message="Could not resolve channel id.")
+            return None, err or YouTubeResolutionError(
+                message="Could not resolve channel id."
+            )
 
     return fetch_channel_snapshot(cid)

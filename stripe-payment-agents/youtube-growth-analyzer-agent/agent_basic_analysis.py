@@ -37,7 +37,9 @@ def _performance_observation(snapshot: ChannelSnapshot) -> str:
     if ratio >= 10:
         return "A few videos strongly outperform the typical recent upload (high hit-rate variance)."
     if ratio >= 3:
-        return "Performance is uneven: some videos punch above the median, others trail."
+        return (
+            "Performance is uneven: some videos punch above the median, others trail."
+        )
     return "Recent uploads are relatively consistent in view performance."
 
 
@@ -48,12 +50,18 @@ def _quick_insights(snapshot: ChannelSnapshot) -> list[str]:
     if views and subs and subs > 0:
         avg_v = sum(views) / len(views)
         vr = avg_v / subs
-        insights.append(f"Rough views-per-subscriber on recent uploads (avg views / subs): {vr:.4f}")
+        insights.append(
+            f"Rough views-per-subscriber on recent uploads (avg views / subs): {vr:.4f}"
+        )
     if snapshot.video_count is not None:
-        insights.append(f"Public video count on the channel page: {snapshot.video_count}")
+        insights.append(
+            f"Public video count on the channel page: {snapshot.video_count}"
+        )
 
     if not insights:
-        insights.append("Subscriber and view signals are partially hidden; premium analysis will focus on patterns we can measure.")
+        insights.append(
+            "Subscriber and view signals are partially hidden; premium analysis will focus on patterns we can measure."
+        )
 
     if len(insights) < 2:
         freq = _upload_frequency_summary(snapshot)

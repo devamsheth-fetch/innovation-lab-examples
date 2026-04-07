@@ -36,7 +36,9 @@ logger = logging.getLogger(__name__)
 def _stripe_expires_at() -> int:
     """Stripe requires expires_at in the future; clamp to [30m, 24h]."""
     expires_in_s = int(time.time()) + 30 * 60
-    return min(int(time.time()) + 24 * 60 * 60, max(expires_in_s, int(time.time()) + 1800))
+    return min(
+        int(time.time()) + 24 * 60 * 60, max(expires_in_s, int(time.time()) + 1800)
+    )
 
 
 def create_embedded_checkout_session(
@@ -110,7 +112,9 @@ def verify_checkout_session_paid(checkout_session_id: str) -> bool:
     return getattr(session, "payment_status", None) == "paid"
 
 
-def verify_checkout_session_amount_usd(checkout_session_id: str, expected_cents: int = STRIPE_AMOUNT_CENTS) -> bool:
+def verify_checkout_session_amount_usd(
+    checkout_session_id: str, expected_cents: int = STRIPE_AMOUNT_CENTS
+) -> bool:
     """
     Extra safety: ensure the paid session total matches the expected USD cents.
     """
@@ -134,7 +138,9 @@ def build_request_payment(
     """Construct seller-side `RequestPayment` with Stripe metadata for embedded Checkout."""
     amount_str = f"{STRIPE_AMOUNT_CENTS / 100:.2f}"
     return RequestPayment(
-        accepted_funds=[Funds(currency="USD", amount=amount_str, payment_method="stripe")],
+        accepted_funds=[
+            Funds(currency="USD", amount=amount_str, payment_method="stripe")
+        ],
         recipient=str(agent_address),
         deadline_seconds=PAYMENT_DEADLINE_SECONDS,
         reference=reference,

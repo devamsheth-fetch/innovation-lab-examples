@@ -8,7 +8,9 @@ from models import ChannelSnapshot, EngagementMetrics, PremiumReport
 logger = logging.getLogger(__name__)
 
 
-def build_premium_report(snapshot: ChannelSnapshot, engagement: EngagementMetrics) -> PremiumReport:
+def build_premium_report(
+    snapshot: ChannelSnapshot, engagement: EngagementMetrics
+) -> PremiumReport:
     """Create the full paid report (deterministic, API-friendly, demo-ready)."""
     tops = top_performing_patterns(snapshot, engagement.top_video_ids_by_views)
     subs = snapshot.subscriber_count
@@ -25,8 +27,9 @@ def build_premium_report(snapshot: ChannelSnapshot, engagement: EngagementMetric
     perf = (
         f"Across the recent sample, median views per upload are about "
         f"{med_v:,.0f} (avg {avg_v:,.0f}) when view counts are available. "
-        f"Estimated upload cadence is about {cadence:.2f} uploads/week." if cadence and avg_v and med_v else
-        "View and cadence signals are partially missing; the premium sections still outline practical next steps."
+        f"Estimated upload cadence is about {cadence:.2f} uploads/week."
+        if cadence and avg_v and med_v
+        else "View and cadence signals are partially missing; the premium sections still outline practical next steps."
     )
 
     if engagement.avg_engagement_rate is not None:
@@ -35,12 +38,8 @@ def build_premium_report(snapshot: ChannelSnapshot, engagement: EngagementMetric
             f"{engagement.avg_engagement_rate:.4f}. "
         )
     else:
-        eng = (
-            "Engagement ratios could not be computed for most uploads (likes/comments hidden or missing). "
-        )
-    eng += (
-        f"Comment-to-view signal looks {engagement.comment_to_view_ratio_hint or 'mixed'} in the sample."
-    )
+        eng = "Engagement ratios could not be computed for most uploads (likes/comments hidden or missing). "
+    eng += f"Comment-to-view signal looks {engagement.comment_to_view_ratio_hint or 'mixed'} in the sample."
 
     patterns = (
         "Recent titles show a mix of formats; consistency in packaging (title + thumbnail promise) tends to reduce variance. "

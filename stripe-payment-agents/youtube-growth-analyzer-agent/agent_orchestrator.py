@@ -72,6 +72,7 @@ from payment_handler import (
     verify_checkout_session_paid,
 )
 
+
 def _configure_logging() -> None:
     level = os.getenv("LOG_LEVEL", "INFO").upper()
     logging.basicConfig(
@@ -102,9 +103,15 @@ def _node_fetch(state: GraphState) -> GraphState:
     from agent_channel_fetch import resolve_and_fetch
 
     snap, err = resolve_and_fetch(state.get("channel_input", ""))
-    if err:
-        hint = f" {err.hint}" if err.hint else ""
-        return {**state, "error": f"{err.message}{hint}", "snapshot": None}
+    if err or snap is None:
+        if err:
+            hint = f" {err.hint}" if err.hint else ""
+            return {**state, "error": f"{err.message}{hint}", "snapshot": None}
+        return {
+            **state,
+            "error": "Could not resolve channel data.",
+            "snapshot": None,
+        }
     return {**state, "error": None, "snapshot": snap.model_dump(mode="json")}
 
 
@@ -301,7 +308,8 @@ def _payment_action_json(checkout: dict[str, Any]) -> str:
         "ui_mode": checkout.get("ui_mode", "embedded"),
         "publishable_key": checkout.get("publishable_key"),
         "client_secret": checkout.get("client_secret"),
-        "checkout_session_id": checkout.get("checkout_session_id") or checkout.get("id"),
+        "checkout_session_id": checkout.get("checkout_session_id")
+        or checkout.get("id"),
     }
     return json.dumps({"payment_action": action}, indent=2)
 
@@ -325,7 +333,11 @@ async def _on_chat_impl(ctx: Context, sender: str, msg: ChatMessage) -> None:
     state = load_state(ctx, sender)
 
     awaiting_payment = bool(state.get("awaiting_payment"))
-    pending = state.get("pending_stripe") if isinstance(state.get("pending_stripe"), dict) else None
+    pending = (
+        state.get("pending_stripe")
+        if isinstance(state.get("pending_stripe"), dict)
+        else None
+    )
 
     ctx.logger.info(
         "[chat] sender=%s session=%s text=%r awaiting_payment=%s",
@@ -343,14 +355,19 @@ async def _on_chat_impl(ctx: Context, sender: str, msg: ChatMessage) -> None:
             # Fall through: run a new free analysis for the newly provided channel.
         elif _looks_like_new_intent(text_l):
             clear_state(ctx, sender)
-            await ctx.send(sender, make_chat("Okay — send a YouTube channel URL or channel name to analyze."))
+            await ctx.send(
+                sender,
+                make_chat(
+                    "Okay — send a YouTube channel URL or channel name to analyze."
+                ),
+            )
             return
         else:
             req = build_request_payment(
                 agent_address=str(ctx.agent.address),
                 reference=str(ctx.session),
                 checkout=pending,
-                description=f"Pay ${STRIPE_AMOUNT_CENTS/100:.2f} to unlock the full premium YouTube growth report.",
+                description=f"Pay ${STRIPE_AMOUNT_CENTS / 100:.2f} to unlock the full premium YouTube growth report.",
             )
             await ctx.send(sender, req)
             await ctx.send(
@@ -377,17 +394,24 @@ async def _on_chat_impl(ctx: Context, sender: str, msg: ChatMessage) -> None:
         result = await asyncio.to_thread(run_free_pipeline, channel_input)
     except Exception as e:
         logger.exception("Free pipeline failed")
-        await ctx.send(sender, make_chat(f"Something went wrong while analyzing the channel: {e}"))
+        await ctx.send(
+            sender, make_chat(f"Something went wrong while analyzing the channel: {e}")
+        )
         return
 
     if result.get("error"):
-        await ctx.send(sender, make_chat(f"Could not analyze that channel yet.\n\n{result['error']}"))
+        await ctx.send(
+            sender,
+            make_chat(f"Could not analyze that channel yet.\n\n{result['error']}"),
+        )
         return
 
     preview_md = str(result.get("preview_markdown") or "")
     snapshot = result.get("snapshot")
     if not isinstance(snapshot, dict):
-        await ctx.send(sender, make_chat("Unexpected internal error: missing channel snapshot."))
+        await ctx.send(
+            sender, make_chat("Unexpected internal error: missing channel snapshot.")
+        )
         return
 
     description = f"{STRIPE_PRODUCT_NAME} — {snapshot.get('title', 'YouTube channel')}"
@@ -416,11 +440,13 @@ async def _on_chat_impl(ctx: Context, sender: str, msg: ChatMessage) -> None:
         agent_address=str(ctx.agent.address),
         reference=str(ctx.session),
         checkout=checkout,
-        description=f"Pay ${STRIPE_AMOUNT_CENTS/100:.2f} to unlock the full premium YouTube growth report.",
+        description=f"Pay ${STRIPE_AMOUNT_CENTS / 100:.2f} to unlock the full premium YouTube growth report.",
     )
     try:
         await ctx.send(sender, req)
-        await ctx.send(sender, make_chat(_compose_paywall_message(preview_md, checkout)))
+        await ctx.send(
+            sender, make_chat(_compose_paywall_message(preview_md, checkout))
+        )
     except Exception as e:
         logger.exception("Failed to send payment request or chat after free preview")
         clear_state(ctx, sender)
@@ -453,22 +479,40 @@ async def on_chat(ctx: Context, sender: str, msg: ChatMessage) -> None:
 
 async def on_commit(ctx: Context, sender: str, msg: CommitPayment) -> None:
     if msg.funds.payment_method != "stripe" or not msg.transaction_id:
-        await ctx.send(sender, RejectPayment(reason="Unsupported payment method (expected stripe)."))
+        await ctx.send(
+            sender,
+            RejectPayment(reason="Unsupported payment method (expected stripe)."),
+        )
         return
 
     paid = await asyncio.to_thread(verify_checkout_session_paid, msg.transaction_id)
     if not paid:
-        await ctx.send(sender, RejectPayment(reason="Stripe payment not completed yet. Please finish checkout."))
+        await ctx.send(
+            sender,
+            RejectPayment(
+                reason="Stripe payment not completed yet. Please finish checkout."
+            ),
+        )
         return
 
-    if not await asyncio.to_thread(verify_checkout_session_amount_usd, msg.transaction_id, STRIPE_AMOUNT_CENTS):
-        await ctx.send(sender, RejectPayment(reason="Paid amount mismatch — please contact support."))
+    if not await asyncio.to_thread(
+        verify_checkout_session_amount_usd, msg.transaction_id, STRIPE_AMOUNT_CENTS
+    ):
+        await ctx.send(
+            sender,
+            RejectPayment(reason="Paid amount mismatch — please contact support."),
+        )
         return
 
     state = load_state(ctx, sender)
     snapshot = state.get("snapshot")
     if not isinstance(snapshot, dict):
-        await ctx.send(sender, RejectPayment(reason="Missing internal session state. Please request a new analysis."))
+        await ctx.send(
+            sender,
+            RejectPayment(
+                reason="Missing internal session state. Please request a new analysis."
+            ),
+        )
         return
 
     await ctx.send(sender, CompletePayment(transaction_id=msg.transaction_id))
@@ -477,12 +521,19 @@ async def on_commit(ctx: Context, sender: str, msg: CommitPayment) -> None:
         premium = await asyncio.to_thread(run_premium_pipeline, snapshot)
     except Exception as e:
         logger.exception("Premium pipeline failed")
-        await ctx.send(sender, make_chat(f"Payment verified, but report generation failed: {e}"))
+        await ctx.send(
+            sender, make_chat(f"Payment verified, but report generation failed: {e}")
+        )
         clear_state(ctx, sender)
         return
 
     if premium.get("error"):
-        await ctx.send(sender, make_chat(f"Payment verified, but report generation failed:\n\n{premium['error']}"))
+        await ctx.send(
+            sender,
+            make_chat(
+                f"Payment verified, but report generation failed:\n\n{premium['error']}"
+            ),
+        )
         clear_state(ctx, sender)
         return
 
@@ -561,7 +612,12 @@ def main() -> None:
             pass
 
     # Validate critical env early for clearer failures.
-    from config import get_stripe_publishable_key, get_stripe_secret_key, get_stripe_success_url, get_youtube_api_key
+    from config import (
+        get_stripe_publishable_key,
+        get_stripe_secret_key,
+        get_stripe_success_url,
+        get_youtube_api_key,
+    )
 
     _ = get_youtube_api_key()
     _ = get_stripe_secret_key()
@@ -582,7 +638,9 @@ def main() -> None:
     agent = Agent(
         name="youtube-growth-analyzer-agent",
         port=AGENT_PORT,
-        seed=os.getenv("AGENT_SEED", "youtube growth analyzer agent secure recovery seed phrase"),
+        seed=os.getenv(
+            "AGENT_SEED", "youtube growth analyzer agent secure recovery seed phrase"
+        ),
         endpoint=endpoint,
         mailbox=use_mailbox,
         enable_agent_inspector=True,
@@ -591,14 +649,27 @@ def main() -> None:
             "Innovation Lab example (chat + seller payment protocols)."
         ),
         metadata={
-            "tags": ["innovationlab", "youtube", "stripe", "langgraph", "asi1", "agent-chat-protocol"],
+            "tags": [
+                "innovationlab",
+                "youtube",
+                "stripe",
+                "langgraph",
+                "asi1",
+                "agent-chat-protocol",
+            ],
             "protocols": ["AgentChatProtocol", "AgentPaymentProtocol"],
-            "payment": {"currency": "USD", "amount": "5.00", "rail": "stripe_embedded_checkout"},
+            "payment": {
+                "currency": "USD",
+                "amount": "5.00",
+                "rail": "stripe_embedded_checkout",
+            },
         },
     )
 
     agent.include(build_chat_proto(on_chat), publish_manifest=True)
-    agent.include(build_payment_proto(on_commit, on_reject_payment), publish_manifest=True)
+    agent.include(
+        build_payment_proto(on_commit, on_reject_payment), publish_manifest=True
+    )
 
     av_token = (os.getenv("AGENTVERSE_API_TOKEN") or "").strip()
     if use_mailbox and av_token:

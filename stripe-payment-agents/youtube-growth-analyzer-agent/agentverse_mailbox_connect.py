@@ -26,7 +26,9 @@ _RETRIES = int(os.getenv("MAILBOX_CONNECT_RETRIES", "6"))
 _RETRY_INTERVAL = float(os.getenv("MAILBOX_CONNECT_RETRY_INTERVAL", "5"))
 
 
-def schedule_mailbox_registration(port: int, user_token: str, delay_seconds: float | None = None) -> None:
+def schedule_mailbox_registration(
+    port: int, user_token: str, delay_seconds: float | None = None
+) -> None:
     """
     POST `AgentverseConnectRequest` to `http://127.0.0.1:{port}/connect` after a delay,
     with retries (connection refused is common if the server is not ready yet).
@@ -39,7 +41,9 @@ def schedule_mailbox_registration(port: int, user_token: str, delay_seconds: flo
         wait = delay_seconds if delay_seconds is not None else _DEFAULT_DELAY
         time.sleep(wait)
         url = f"http://127.0.0.1:{port}/connect"
-        body = json.dumps({"user_token": token, "agent_type": "mailbox"}).encode("utf-8")
+        body = json.dumps({"user_token": token, "agent_type": "mailbox"}).encode(
+            "utf-8"
+        )
 
         last_err: str | None = None
         for attempt in range(1, _RETRIES + 1):
@@ -57,7 +61,9 @@ def schedule_mailbox_registration(port: int, user_token: str, delay_seconds: flo
                     parsed = json.loads(raw) if raw.strip() else {}
                 except json.JSONDecodeError:
                     parsed = {}
-                success = parsed.get("success", True) if isinstance(parsed, dict) else True
+                success = (
+                    parsed.get("success", True) if isinstance(parsed, dict) else True
+                )
                 detail = parsed.get("detail") if isinstance(parsed, dict) else None
                 if success:
                     logger.info(
@@ -94,7 +100,9 @@ def schedule_mailbox_registration(port: int, user_token: str, delay_seconds: flo
                     e,
                 )
             except Exception:
-                logger.exception("Mailbox registration attempt %s/%s failed", attempt, _RETRIES)
+                logger.exception(
+                    "Mailbox registration attempt %s/%s failed", attempt, _RETRIES
+                )
 
             if attempt < _RETRIES:
                 time.sleep(_RETRY_INTERVAL)
@@ -108,4 +116,6 @@ def schedule_mailbox_registration(port: int, user_token: str, delay_seconds: flo
             port,
         )
 
-    threading.Thread(target=_run, name="agentverse-mailbox-connect", daemon=True).start()
+    threading.Thread(
+        target=_run, name="agentverse-mailbox-connect", daemon=True
+    ).start()
