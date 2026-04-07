@@ -505,6 +505,29 @@ async def on_commit(ctx: Context, sender: str, msg: CommitPayment) -> None:
         return
 
     state = load_state(ctx, sender)
+    pending = state.get("pending_stripe")
+    pending_session_id = None
+    if isinstance(pending, dict):
+        pending_session_id = pending.get("checkout_session_id") or pending.get("id")
+
+    if not state.get("awaiting_payment") or not isinstance(pending_session_id, str):
+        await ctx.send(
+            sender,
+            RejectPayment(
+                reason="No pending payment session found. Please request a new analysis."
+            ),
+        )
+        return
+
+    if msg.transaction_id != pending_session_id:
+        await ctx.send(
+            sender,
+            RejectPayment(
+                reason="Payment session mismatch. Please complete the currently requested checkout."
+            ),
+        )
+        return
+
     snapshot = state.get("snapshot")
     if not isinstance(snapshot, dict):
         await ctx.send(
