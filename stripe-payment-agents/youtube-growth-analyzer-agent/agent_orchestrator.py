@@ -458,12 +458,12 @@ async def _on_chat_impl(ctx: Context, sender: str, msg: ChatMessage) -> None:
         )
     except Exception as e:
         logger.exception("Failed to send payment request or chat after free preview")
-        clear_state(ctx, sender)
         await ctx.send(
             sender,
             make_chat(
-                f"Free preview was generated, but payment setup failed: {e}\n\n"
-                "Check **STRIPE_SECRET_KEY** / **STRIPE_PUBLISHABLE_KEY** and **STRIPE_SUCCESS_URL** in `.env`."
+                "Free preview was generated, but one payment message failed to deliver."
+                " If you already see a Pay button, complete checkout and then confirm payment."
+                f"\n\nError detail: {e}"
             ),
         )
 

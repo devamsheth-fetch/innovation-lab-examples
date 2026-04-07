@@ -107,7 +107,13 @@ def create_embedded_checkout_session(
 def verify_checkout_session_paid(checkout_session_id: str) -> bool:
     """Return True if the Checkout Session exists and is paid."""
     stripe.api_key = get_stripe_secret_key()
-    session = stripe.checkout.Session.retrieve(checkout_session_id)
+    try:
+        session = stripe.checkout.Session.retrieve(checkout_session_id)
+    except stripe.error.StripeError as e:
+        logger.warning(
+            "Stripe session verification failed for %s: %s", checkout_session_id, e
+        )
+        return False
     return getattr(session, "payment_status", None) == "paid"
 
 
@@ -118,7 +124,13 @@ def verify_checkout_session_amount_usd(
     Extra safety: ensure the paid session total matches the expected USD cents.
     """
     stripe.api_key = get_stripe_secret_key()
-    session = stripe.checkout.Session.retrieve(checkout_session_id)
+    try:
+        session = stripe.checkout.Session.retrieve(checkout_session_id)
+    except stripe.error.StripeError as e:
+        logger.warning(
+            "Stripe amount verification failed for %s: %s", checkout_session_id, e
+        )
+        return False
     if getattr(session, "payment_status", None) != "paid":
         return False
     total = getattr(session, "amount_total", None)
