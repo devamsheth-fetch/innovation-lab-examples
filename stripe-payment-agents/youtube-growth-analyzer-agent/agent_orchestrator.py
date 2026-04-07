@@ -350,8 +350,18 @@ async def _on_chat_impl(ctx: Context, sender: str, msg: ChatMessage) -> None:
         awaiting_payment,
     )
 
-    # If payment is pending, either continue waiting or start a fresh analysis if the user sends a new channel.
-    if awaiting_payment and pending:
+    if awaiting_payment:
+        if not pending:
+            clear_state(ctx, sender)
+            await ctx.send(
+                sender,
+                make_chat(
+                    "Your previous payment session has expired or is invalid. "
+                    "Please send a YouTube channel URL or name to start a new analysis."
+                ),
+            )
+            return
+
         parsed_channel_id, parsed_handle = parse_youtube_channel_id_or_handle(text)
         has_explicit_locator = bool(
             parsed_channel_id
@@ -583,13 +593,27 @@ async def on_commit(ctx: Context, sender: str, msg: CommitPayment) -> None:
         len(body),
         PREMIUM_REPORT_CHUNK_CHARS,
     )
-    for i, chunk in enumerate(chunks):
-        if i == 0:
-            text = "**Premium report unlocked (paid)**\n\n" + chunk
-        else:
-            text = f"**(Premium report continued {i + 1}/{total})**\n\n{chunk}"
-        await ctx.send(sender, make_chat(text))
-    clear_state(ctx, sender)
+    try:
+        for i, chunk in enumerate(chunks):
+            if i == 0:
+                text = "**Premium report unlocked (paid)**\n\n" + chunk
+            else:
+                text = f"**(Premium report continued {i + 1}/{total})**\n\n{chunk}"
+            await ctx.send(sender, make_chat(text))
+    except Exception as e:
+        logger.exception("Failed sending premium report chunk %d/%d", i + 1, total)
+        try:
+            await ctx.send(
+                sender,
+                make_chat(
+                    f"Part of the premium report could not be delivered (chunk {i + 1}/{total}). "
+                    "Please start a new analysis to regenerate the report — you will NOT be charged again."
+                ),
+            )
+        except Exception:
+            logger.exception("Could not notify user about chunk delivery failure")
+    finally:
+        clear_state(ctx, sender)
 
 
 async def on_reject_payment(ctx: Context, sender: str, msg: RejectPayment) -> None:

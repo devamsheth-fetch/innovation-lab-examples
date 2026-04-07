@@ -34,9 +34,44 @@ def _parse_rfc3339(ts: str | None) -> datetime | None:
         return None
 
 
+_CONVERSATIONAL_PHRASES = frozenset(
+    {
+        "hello",
+        "hi",
+        "hey",
+        "help",
+        "yes",
+        "no",
+        "ok",
+        "okay",
+        "sure",
+        "thanks",
+        "thank you",
+        "bye",
+        "reset",
+        "start over",
+        "new analysis",
+        "i paid",
+        "done",
+        "cancel",
+        "stop",
+        "what",
+        "how",
+        "why",
+    }
+)
+
+
+def _is_conversational(text: str) -> bool:
+    """Return True if the text looks like a conversational phrase rather than a channel name."""
+    normalized = re.sub(r"[^\w\s]", "", text.lower()).strip()
+    return normalized in _CONVERSATIONAL_PHRASES
+
+
 def extract_channel_locator(user_text: str) -> str:
     """
-    Extract a channel URL, @handle, channel id, or fall back to the first non-empty line.
+    Extract a channel URL, @handle, channel id, or fall back to the first non-empty line
+    only when it looks like a plausible channel name (not a conversational phrase).
 
     Scans all lines so users can type a greeting on line 1 and paste a URL on line 2.
     """
@@ -53,7 +88,10 @@ def extract_channel_locator(user_text: str) -> str:
         if re.fullmatch(r"UC[\w-]{10,}", ln.strip()):
             return ln.strip()
 
-    return lines[0].strip()
+    candidate = lines[0].strip()
+    if _is_conversational(candidate):
+        return ""
+    return candidate
 
 
 def parse_youtube_channel_id_or_handle(text: str) -> tuple[str | None, str | None]:
