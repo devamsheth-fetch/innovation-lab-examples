@@ -35,10 +35,9 @@ logger = logging.getLogger(__name__)
 
 def _stripe_expires_at() -> int:
     """Stripe requires expires_at in the future; clamp to [30m, 24h]."""
-    expires_in_s = int(time.time()) + 30 * 60
-    return min(
-        int(time.time()) + 24 * 60 * 60, max(expires_in_s, int(time.time()) + 1800)
-    )
+    now = int(time.time())
+    clamped_ttl = min(24 * 60 * 60, max(PAYMENT_DEADLINE_SECONDS, 30 * 60))
+    return now + clamped_ttl
 
 
 def create_embedded_checkout_session(
