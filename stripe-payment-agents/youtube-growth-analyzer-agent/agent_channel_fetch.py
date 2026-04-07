@@ -199,9 +199,9 @@ def fetch_channel_snapshot(
                 if not vid:
                     continue
                 video_ids.append(vid)
-                published = (row.get("contentDetails") or {}).get("videoPublishedAt") or (
-                    row.get("snippet") or {}
-                ).get("publishedAt")
+                published = (row.get("contentDetails") or {}).get(
+                    "videoPublishedAt"
+                ) or (row.get("snippet") or {}).get("publishedAt")
                 parsed = _parse_rfc3339(published)
                 if parsed:
                     playlist_published_at[vid] = parsed
@@ -222,9 +222,9 @@ def fetch_channel_snapshot(
                     vid = v["id"]
                     st = v.get("statistics") or {}
                     sn = v.get("snippet") or {}
-                    pub = _parse_rfc3339(sn.get("publishedAt")) or playlist_published_at.get(
-                        vid
-                    )
+                    pub = _parse_rfc3339(
+                        sn.get("publishedAt")
+                    ) or playlist_published_at.get(vid)
                     if pub is None:
                         # Skip entries with unknown timestamps to avoid corrupting recency-based analysis.
                         continue

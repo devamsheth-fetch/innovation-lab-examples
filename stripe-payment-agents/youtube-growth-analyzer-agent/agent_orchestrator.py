@@ -54,7 +54,10 @@ from uagents_core.contrib.protocols.payment import (
 
 from agent_basic_analysis import build_free_preview
 from agentverse_mailbox_connect import schedule_mailbox_registration
-from agent_channel_fetch import extract_channel_locator, parse_youtube_channel_id_or_handle
+from agent_channel_fetch import (
+    extract_channel_locator,
+    parse_youtube_channel_id_or_handle,
+)
 from agent_engagement import analyze_engagement
 from agent_strategy import build_premium_report
 from config import (
