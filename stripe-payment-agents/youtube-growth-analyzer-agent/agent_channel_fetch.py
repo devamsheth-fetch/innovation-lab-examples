@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
@@ -193,11 +193,18 @@ def fetch_channel_snapshot(
             )
             pl_items = pl.get("items") or []
             video_ids: list[str] = []
+            playlist_published_at: dict[str, datetime] = {}
             for row in pl_items:
                 vid = (row.get("contentDetails") or {}).get("videoId")
                 if not vid:
                     continue
                 video_ids.append(vid)
+                published = (row.get("contentDetails") or {}).get("videoPublishedAt") or (
+                    row.get("snippet") or {}
+                ).get("publishedAt")
+                parsed = _parse_rfc3339(published)
+                if parsed:
+                    playlist_published_at[vid] = parsed
 
             videos: list[VideoSnippet] = []
             # Batch videos.list in chunks
@@ -215,7 +222,12 @@ def fetch_channel_snapshot(
                     vid = v["id"]
                     st = v.get("statistics") or {}
                     sn = v.get("snippet") or {}
-                    pub = _parse_rfc3339(sn.get("publishedAt"))
+                    pub = _parse_rfc3339(sn.get("publishedAt")) or playlist_published_at.get(
+                        vid
+                    )
+                    if pub is None:
+                        # Skip entries with unknown timestamps to avoid corrupting recency-based analysis.
+                        continue
                     views = int(st["viewCount"]) if st.get("viewCount") else None
                     likes = int(st["likeCount"]) if st.get("likeCount") else None
                     comments = (
@@ -225,7 +237,7 @@ def fetch_channel_snapshot(
                         VideoSnippet(
                             video_id=vid,
                             title=sn.get("title") or "",
-                            published_at=pub or datetime.now(timezone.utc),
+                            published_at=pub,
                             view_count=views,
                             like_count=likes,
                             comment_count=comments,

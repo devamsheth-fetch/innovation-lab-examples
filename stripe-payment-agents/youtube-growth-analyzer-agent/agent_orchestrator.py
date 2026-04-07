@@ -54,7 +54,7 @@ from uagents_core.contrib.protocols.payment import (
 
 from agent_basic_analysis import build_free_preview
 from agentverse_mailbox_connect import schedule_mailbox_registration
-from agent_channel_fetch import extract_channel_locator
+from agent_channel_fetch import extract_channel_locator, parse_youtube_channel_id_or_handle
 from agent_engagement import analyze_engagement
 from agent_strategy import build_premium_report
 from config import (
@@ -349,8 +349,14 @@ async def _on_chat_impl(ctx: Context, sender: str, msg: ChatMessage) -> None:
 
     # If payment is pending, either continue waiting or start a fresh analysis if the user sends a new channel.
     if awaiting_payment and pending:
-        loc = extract_channel_locator(text)
-        if loc:
+        parsed_channel_id, parsed_handle = parse_youtube_channel_id_or_handle(text)
+        has_explicit_locator = bool(
+            parsed_channel_id
+            or parsed_handle
+            or ("youtube.com" in text_l)
+            or ("youtu.be" in text_l)
+        )
+        if has_explicit_locator:
             clear_state(ctx, sender)
             # Fall through: run a new free analysis for the newly provided channel.
         elif _looks_like_new_intent(text_l):
