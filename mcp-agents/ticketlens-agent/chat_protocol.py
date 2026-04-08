@@ -318,6 +318,14 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             )
 
         while True:
+            if iteration >= 5:
+                ctx.logger.warning(
+                    f"[{sender[:16]}...] Reasoning loop hit maximum iteration limit (5). Breaking to prevent infinite loop or quota drain."
+                )
+                # Break natively; it will fall through to final answer generation 
+                # using the content from the previous turns.
+                break
+
             iteration += 1
 
             # One single call — let the model choose naturally, but grounded by the hint
