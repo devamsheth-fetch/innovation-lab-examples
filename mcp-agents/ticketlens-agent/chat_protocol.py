@@ -93,90 +93,6 @@ All tools require arguments wrapped in a `payload` key. You MUST follow these ex
 """
 
 
-def _format_tour_results(raw_json: str) -> str:
-    """
-    Programmatically generates a 'Strong' Markdown presentation for search results.
-    Takes raw JSON from search_tours or get_tour.
-    Includes Idea 1 (CTAs) and Idea 2 (Rich Metadata).
-    """
-    try:
-        data = json.loads(raw_json)
-        # Handle list of tours (search_tours returns 'offers', fallback to 'items')
-        items: list[dict] = []
-        if isinstance(data, dict):
-            items = data.get("offers") or data.get("items") or []
-
-        # Handle single tour (get_tour returns a flat object with 'id')
-        if not items and isinstance(data, dict) and "id" in data:
-            items = [data]
-
-        if not items:
-            return ""
-
-        output = "\n\n---\n### 📍 Discovered Experiences\n"
-        for i, item in enumerate(items, 1):
-            title = item.get("title", "Unknown Experience")
-
-            # Grouping price info
-            price_info = item.get("price")
-            if isinstance(price_info, dict):
-                # Search results price
-                price = (
-                    item.get("price_formatted")
-                    or f"From €{price_info.get('eur', '??')}"
-                )
-            else:
-                price = item.get("price_formatted") or item.get(
-                    "price", "Price on request"
-                )
-
-            rating = item.get("rating", "N/A")
-            duration = item.get("duration") or item.get("duration_formatted")
-
-            # Languages: handle list or string
-            langs_val = item.get("languages")
-            langs = ", ".join(langs_val) if isinstance(langs_val, list) else langs_val
-
-            cancel = item.get("cancellation_policy") or item.get(
-                "free_cancellation_description"
-            )
-            # Deep extraction for image_url (it might be nested in main_image)
-            img_url = item.get("image_url")
-            if not img_url and "main_image" in item:
-                img_url = item["main_image"].get("image_url")
-            if not img_url and "poi_info" in item:
-                img_url = item["poi_info"].get("image_url")
-
-            # Booking CTA (Idea 1)
-            book_url = item.get("url") or item.get("booking_url")
-
-            output += f"#### {i}. {title}\n"
-            if img_url:
-                output += f"![{title}]({img_url})\n"
-
-            # Detail Section
-            output += f"- **Price**: {price}\n"
-            output += f"- **Rating**: {rating} ⭐"
-            if duration:
-                output += f" | **Duration**: {duration}"
-            output += "\n"
-
-            if langs:
-                output += f"- **Languages**: {langs}\n"
-            if cancel:
-                output += f"- **Policy**: {cancel}\n"
-
-            if book_url:
-                output += f"\n[🎟️ **Book this Experience**]({book_url})\n"
-
-            output += "\n"
-
-        output += "---\n"
-        return output
-    except Exception:
-        return ""
-
-
 def _build_send_response(text: str, end_session: bool = False):
     """Helper to build a ChatMessage response aligned with ASI1 standards."""
     content = [TextContent(type="text", text=text)]
@@ -322,7 +238,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 ctx.logger.warning(
                     f"[{sender[:16]}...] Reasoning loop hit maximum iteration limit (5). Breaking to prevent infinite loop or quota drain."
                 )
-                # Break natively; it will fall through to final answer generation 
+                # Break natively; it will fall through to final answer generation
                 # using the content from the previous turns.
                 break
 
