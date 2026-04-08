@@ -112,7 +112,9 @@ async def fetch_mcp_tools(retries: int = 3, backoff: float = 2.0):
                 await asyncio.sleep(wait)
             else:
                 logger.error(f"[MCP] All {retries} bootstrap attempts failed.")
-    raise last_error
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Failed to fetch MCP tools")
 
 
 async def _call_single_tool(sess, tool_call, storage, semaphore):

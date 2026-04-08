@@ -102,7 +102,7 @@ def _format_tour_results(raw_json: str) -> str:
     try:
         data = json.loads(raw_json)
         # Handle list of tours (search_tours returns 'offers', fallback to 'items')
-        items = []
+        items: list[dict] = []
         if isinstance(data, dict):
             items = data.get("offers") or data.get("items") or []
 
