@@ -238,6 +238,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 ctx.logger.warning(
                     f"[{sender[:16]}...] Reasoning loop hit maximum iteration limit (5). Breaking to prevent infinite loop or quota drain."
                 )
+                final_answer_override = "I hit an internal processing limit trying to search for that. Here is what I found so far; please be a bit more specific."
                 # Break natively; it will fall through to final answer generation
                 # using the content from the previous turns.
                 break
@@ -406,14 +407,25 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             )
 
         # 6. Persist the updated session history for this sender
-        # Part 2: Session Management (Store messages with last_active timestamp)
+        # Filter out transient system hints to prevent context drift in future turns
+        persisted_history = [
+            m
+            for m in conversation_history
+            if not (
+                m.get("role") == "system"
+                and str(m.get("content", "")).startswith("SYSTEM")
+            )
+        ]
         ctx.storage.set(
-            history_key, {"messages": conversation_history, "last_active": time.time()}
+            history_key, {"messages": persisted_history, "last_active": time.time()}
         )
 
         # 7. Send the final answer back — session stays open for follow-ups
         #    Images are now embedded inline by the LLM, no separate block needed.
-        final_answer = assistant_msg.content or "I've gathered these results for you."
+        fallback_msg = locals().get(
+            "final_answer_override", "I've gathered these results for you."
+        )
+        final_answer = assistant_msg.content or fallback_msg
         await ctx.send(sender, _build_send_response(final_answer, end_session=False))
 
     except Exception as e:
