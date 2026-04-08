@@ -8,8 +8,8 @@ services:
     env_file:
       - .env
     restart: unless-stopped
-    # Since uAgents doesn't need external ports unless using a public endpoint directly
-    # we just let it run its mailbox client.
+    ports:
+      - "8000:8000"
     logging:
       driver: "json-file"
       options:

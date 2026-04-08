@@ -60,8 +60,20 @@ MCP_SERVER_URL=https://mcp.ticketlens.com/
 
 ## 6) Run the Agent
 
+### Native Execution
 ```bash
 python agent.py
+```
+
+### Docker Execution
+To run the agent in an isolated container using the included Docker configurations:
+```bash
+docker compose up -d --build
+```
+
+To view the agent's logs:
+```bash
+docker compose logs -f ticketlens-agent
 ```
 
 ## 7) Expected Output
@@ -74,9 +86,34 @@ python agent.py
 
 ![ASI Demo](./assets/demo.png)
 
-## 9) Architecture (Optional)
+## 9) Architecture
 
-The agent utilizes parallel execution logic combined with persistent state (`ctx.storage`) to aggressively cache network calls. An `asyncio.Semaphore` guarantees the backend API limits (100 req/day) are not exceeded during multi-query planning. 
+```
+User Chat ──► Chat Protocol ──► LLM (ASI:One) ──► MCP Client ──► TicketLens API
+    ▲              │                                │
+    │              ▼                                ▼
+    └────── uAgents Context Storage ◄───────────────┘
+                     (Quota & Cache State)
+```
+
+**Flow**: User sends natural language → `chat_protocol` evaluates intent → ASI:One reasoning engine dictates tool calls → `mcp_client` queries TicketLens → Responses are cached in `ctx.storage` → Final markdown results are rendered back to user.
+
+### 📁 Three Core Files
+
+#### 1. `mcp_client.py` - Network & Cache Layer
+**Purpose**: Manages communication with the remote TicketLens MCP server and protects global API quotas.
+- **Persistent Caching**: Utilizes the `uAgents` storage wrapper (`ctx.storage`) to aggressively cache POI and tour data, verifying TTL cleanly before triggering remote network requests.
+- **Image Enrichment**: Auto-injects explicit CDN resolution links to raw internal POI database IDs.
+
+#### 2. `chat_protocol.py` - Reasoning Engine
+**Purpose**: The central brain driving conversational interaction and LLM tool execution.
+- **Parallel Tool Resolving**: Simultaneously fields multiple sub-queries defined by the LLM (e.g. searching "Louvre" and "Eiffel Tower" within one pass) using isolated `asyncio` task groups.
+- **Session Pruning**: Automatically prunes conversation buffers (`history_{user_address}`) after configurable inactivity windows to optimize token context.
+
+#### 3. `agent.py` - Lifecycle Orchestrator
+**Purpose**: System entrypoint and infrastructure definition.
+- **Mailbox Protocol**: Configures the agent to communicate seamlessly via the Agentverse Mailbox system while exposing a local inspector HTTP server on port `8000`.
+- **Bootstrapping**: Fetches and stores the MCP remote tool capabilities dictionary during the `@agent.on_event("startup")` lifecycle hook.
 
 ## 10) Troubleshooting
 
