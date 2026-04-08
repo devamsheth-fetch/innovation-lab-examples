@@ -162,6 +162,9 @@ async def _call_single_tool(sess, tool_call, storage, semaphore):
 
             return (tool_call.id, raw_content), 1  # (Result, NetworkCallCount)
 
+        except asyncio.CancelledError:
+            # Re-raise cancellation to prevent swallowing task timeouts
+            raise
         except BaseException as e:
             logger.error(f"[MCP] Tool call '{t_name}' failed: {e}")
             error_detail = str(e)
@@ -191,7 +194,17 @@ async def execute_mcp_tools(storage, tool_calls):
 
     for tool_call in tool_calls:
         t_name = tool_call.function.name
-        t_args = json.loads(tool_call.function.arguments)
+        try:
+            t_args = json.loads(tool_call.function.arguments)
+        except json.JSONDecodeError as err:
+            logger.error(f"[MCP] Invalid JSON produced for '{t_name}': {err}")
+            final_results.append(
+                (
+                    tool_call.id,
+                    f"Error: Tool argument parsing failed. JSONDecodeError: {err}",
+                )
+            )
+            continue
 
         args_str = json.dumps(t_args, sort_keys=True)
         args_hash = hashlib.md5(args_str.encode()).hexdigest()

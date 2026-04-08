@@ -114,7 +114,6 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     Runs the ASI1 LLM reasoning loop, executing MCP tool calls as needed,
     until a final text response is ready to return.
     """
-    latest_search_results = ""  # Initialize here to prevent UnboundLocalError
     # 1. Acknowledge receipt immediately (required by the Chat Protocol)
     await ctx.send(
         sender,
@@ -304,18 +303,18 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
 
             # Feed tool results back into the conversation history
             # Truncate 'offers' to top 10 before passing to LLM (prevents token overflow and duplication)
+            all_offers: list[dict] = []
             for tool_call_id, content in tool_results:
                 try:
                     parsed = json.loads(content)
                     if isinstance(parsed, dict) and "offers" in parsed:
                         parsed["offers"] = parsed["offers"][:10]
                         content = json.dumps(parsed)
+                        all_offers.extend(parsed["offers"])
+                    elif isinstance(parsed, dict) and "id" in parsed:
+                        all_offers.append(parsed)
                 except Exception:
                     pass
-
-                # Track if this result has rich media for image injection
-                if '"image_url":' in content or '"image_id":' in content:
-                    latest_search_results = content
 
                 preview = content[:300] + "..." if len(content) > 300 else content
                 ctx.logger.info(f"  ← Tool result [{tool_call_id[:12]}...]: {preview}")
@@ -327,20 +326,19 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 conversation_history.append(tool_msg)
 
             # Build a rich hint map with all display fields for side-by-side card layout
-            if latest_search_results:
+            if all_offers:
                 try:
-                    parsed = json.loads(latest_search_results)
-                    offers = parsed.get("offers") or (
-                        [parsed] if "id" in parsed else []
-                    )
                     hint_lines = []
-                    for item in offers:
+                    for item in all_offers:
                         title = item.get("title", "")
                         img = item.get("image_url", "")
                         book = item.get("url") or item.get("booking_url", "")
                         price_obj = item.get("price")
                         if isinstance(price_obj, dict):
-                            price = f"£{price_obj.get('gbp', '??')}"
+                            price = (
+                                item.get("price_formatted")
+                                or f"€{price_obj.get('eur', price_obj.get('gbp', '??'))}"
+                            )
                         else:
                             price = item.get("price_formatted") or "—"
                         rating = item.get("rating", "")
@@ -369,7 +367,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                     if hint_lines:
                         hint_map = "\n".join(hint_lines)
                         # Build a sample img tag using the first item's dimensions for the template
-                        first = offers[0] if offers else {}
+                        first = all_offers[0] if all_offers else {}
                         _s = _re.search(r"/(\d+)x(\d+)", first.get("image_url", ""))
                         tpl_w, tpl_h = (_s.group(1), _s.group(2)) if _s else ("W", "H")
                         conversation_history.append(
