@@ -635,7 +635,7 @@ def _extract_intake(text: str, state: dict) -> dict:
 
 
 def _intake_complete(state: dict) -> bool:
-    return bool(state["vibe"] and state["who"])
+    return bool(state["vibe"])
 
 
 # ---------------------------------------------------------------------------
@@ -895,7 +895,7 @@ async def on_chat_message(ctx: Context, sender: str, msg: ChatMessage) -> None:
         content_type = "show" if state["media_type"] == "tv" else "movie"
         follow_up = (
             f"What's the vibe tonight — on-edge, slow-burn, dark, funny, romantic? "
-            f"And who are you watching with? Any {content_type} you loved recently?"
+            f"Any {content_type} you loved recently?"
         )
         state["history"].append({"role": "assistant", "content": follow_up})
         _save_state(ctx, state)
