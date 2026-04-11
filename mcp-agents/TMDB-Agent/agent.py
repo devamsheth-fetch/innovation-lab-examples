@@ -18,34 +18,35 @@ Session state stored in ctx.storage:
   watchlist   — JSON list of {label, text} saved recommendation sets
   seen_titles — JSON list of movie/show titles already seen
 """
+
 from __future__ import annotations
 import json
 import os
+import pathlib
 import re
-import asyncio
+import sys
+from datetime import datetime, timezone
 from typing import Any
+from uuid import uuid4
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
-from uagents import Agent, Context, Protocol
-from uagents.setup import fund_agent_if_low
-from uagents_core.contrib.protocols.chat import (
-    AgentContent,
+from uagents import Agent, Context, Protocol  # noqa: E402
+from uagents.setup import fund_agent_if_low  # noqa: E402
+from uagents_core.contrib.protocols.chat import (  # noqa: E402
     ChatAcknowledgement,
     ChatMessage,
-    EndSessionContent,
     StartSessionContent,
     TextContent,
     chat_protocol_spec,
 )
+from openai import AsyncOpenAI  # noqa: E402
 
-from openai import AsyncOpenAI
-
-import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
-from tonights_pick_mcp.tools import (
+from tonights_pick_mcp.tools import (  # noqa: E402
     search_movies,
     get_similar,
     get_recommendations,
@@ -54,7 +55,6 @@ from tonights_pick_mcp.tools import (
     search_by_keyword,
     get_movie_details,
     check_watch_providers,
-    # TV tools
     search_tv,
     get_similar_tv,
     get_tv_details,
@@ -159,7 +159,10 @@ MOVIE_TOOL_SCHEMAS: list[dict] = [
                 "properties": {
                     "vibe": {"type": "string"},
                     "limit": {"type": "integer", "default": 10},
-                    "max_runtime": {"type": "integer", "description": "Max runtime in minutes"},
+                    "max_runtime": {
+                        "type": "integer",
+                        "description": "Max runtime in minutes",
+                    },
                 },
                 "required": ["vibe"],
             },
@@ -173,8 +176,16 @@ MOVIE_TOOL_SCHEMAS: list[dict] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "media_type": {"type": "string", "enum": ["movie", "tv"], "default": "movie"},
-                    "window": {"type": "string", "enum": ["day", "week"], "default": "week"},
+                    "media_type": {
+                        "type": "string",
+                        "enum": ["movie", "tv"],
+                        "default": "movie",
+                    },
+                    "window": {
+                        "type": "string",
+                        "enum": ["day", "week"],
+                        "default": "week",
+                    },
                     "limit": {"type": "integer", "default": 10},
                 },
             },
@@ -240,11 +251,26 @@ MOVIE_TOOL_SCHEMAS: list[dict] = [
                         "items": {
                             "type": "object",
                             "properties": {
-                                "vibe":      {"type": "string", "description": "Short vibe label, e.g. 'slow-burn dread'"},
-                                "title":     {"type": "string", "description": "Movie title only, no year"},
-                                "runtime":   {"type": "string", "description": "Runtime, e.g. '119 min'"},
-                                "reason":    {"type": "string", "description": "One sentence why this fits"},
-                                "streaming": {"type": "string", "description": "Streaming service name(s)"},
+                                "vibe": {
+                                    "type": "string",
+                                    "description": "Short vibe label, e.g. 'slow-burn dread'",
+                                },
+                                "title": {
+                                    "type": "string",
+                                    "description": "Movie title only, no year",
+                                },
+                                "runtime": {
+                                    "type": "string",
+                                    "description": "Runtime, e.g. '119 min'",
+                                },
+                                "reason": {
+                                    "type": "string",
+                                    "description": "One sentence why this fits",
+                                },
+                                "streaming": {
+                                    "type": "string",
+                                    "description": "Streaming service name(s)",
+                                },
                             },
                             "required": ["vibe", "title", "reason", "streaming"],
                         },
@@ -329,7 +355,11 @@ TV_TOOL_SCHEMAS: list[dict] = [
                 "type": "object",
                 "properties": {
                     "media_type": {"type": "string", "enum": ["tv"], "default": "tv"},
-                    "window": {"type": "string", "enum": ["day", "week"], "default": "week"},
+                    "window": {
+                        "type": "string",
+                        "enum": ["day", "week"],
+                        "default": "week",
+                    },
                     "limit": {"type": "integer", "default": 10},
                 },
             },
@@ -363,11 +393,26 @@ TV_TOOL_SCHEMAS: list[dict] = [
                         "items": {
                             "type": "object",
                             "properties": {
-                                "vibe":      {"type": "string", "description": "Short vibe label, e.g. 'slow-burn dread'"},
-                                "title":     {"type": "string", "description": "Show title only"},
-                                "runtime":   {"type": "string", "description": "e.g. '3 seasons, ~45 min/ep'"},
-                                "reason":    {"type": "string", "description": "One sentence why this fits"},
-                                "streaming": {"type": "string", "description": "Streaming service name(s)"},
+                                "vibe": {
+                                    "type": "string",
+                                    "description": "Short vibe label, e.g. 'slow-burn dread'",
+                                },
+                                "title": {
+                                    "type": "string",
+                                    "description": "Show title only",
+                                },
+                                "runtime": {
+                                    "type": "string",
+                                    "description": "e.g. '3 seasons, ~45 min/ep'",
+                                },
+                                "reason": {
+                                    "type": "string",
+                                    "description": "One sentence why this fits",
+                                },
+                                "streaming": {
+                                    "type": "string",
+                                    "description": "Streaming service name(s)",
+                                },
                             },
                             "required": ["vibe", "title", "reason", "streaming"],
                         },
@@ -443,6 +488,7 @@ You can also:
 # Storage helpers
 # ---------------------------------------------------------------------------
 
+
 def _load_state(ctx: Context) -> dict:
     return {
         "vibe": ctx.storage.get("vibe") or "",
@@ -478,6 +524,7 @@ def _save_state(ctx: Context, state: dict) -> None:
 # Intent detection (runs before normal intake)
 # ---------------------------------------------------------------------------
 
+
 def _detect_special_intent(text: str) -> str | None:
     """Return a special intent string or None for normal recommendation flow."""
     lower = text.lower()
@@ -497,9 +544,15 @@ def _detect_special_intent(text: str) -> str | None:
 
     # --- Show watchlist ---
     watchlist_show = [
-        "show watchlist", "show my watchlist", "show wishlist", "show my wishlist",
-        "what's saved", "what did i save", "show my list",
-        "my watchlist", "my wishlist",
+        "show watchlist",
+        "show my watchlist",
+        "show wishlist",
+        "show my wishlist",
+        "what's saved",
+        "what did i save",
+        "show my list",
+        "my watchlist",
+        "my wishlist",
     ]
     if any(p in lower for p in watchlist_show):
         return "show_watchlist"
@@ -520,7 +573,7 @@ def _extract_specific_title(text: str) -> str | None:
     if cleaned and cleaned not in {"it", "that", "them", "those", "this"}:
         idx = text.lower().find(cleaned)
         if idx != -1:
-            return text[idx: idx + len(cleaned)].strip(".,!?")
+            return text[idx : idx + len(cleaned)].strip(".,!?")
     return None
 
 
@@ -529,6 +582,7 @@ def _extract_mark_seen_title(text: str) -> str | None:
     m = re.search(r"\bmark\s+(.+?)\s+as\s+(?:seen|watched)\b", text, re.IGNORECASE)
     if m:
         return m.group(1).strip().strip(".,!?")
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -536,10 +590,23 @@ def _extract_mark_seen_title(text: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 _VIBE_KEYWORDS = [
-    "on-edge", "slow-burn", "dark", "intense", "feel-good",
-    "romantic", "cosy", "cozy", "mind-bending", "scary",
-    "funny", "action-packed", "tearjerker", "thriller",
-    "comedy", "horror", "drama",
+    "on-edge",
+    "slow-burn",
+    "dark",
+    "intense",
+    "feel-good",
+    "romantic",
+    "cosy",
+    "cozy",
+    "mind-bending",
+    "scary",
+    "funny",
+    "action-packed",
+    "tearjerker",
+    "thriller",
+    "comedy",
+    "horror",
+    "drama",
 ]
 
 
@@ -548,14 +615,25 @@ def _extract_intake(text: str, state: dict) -> dict:
     lower = text.lower()
 
     # --- media_type (TV mode) ---
-    tv_signals = ["binge", "series", "tv show", "tv series", "show me a show",
-                  "something to watch on tv", "a series", "episodes"]
+    tv_signals = [
+        "binge",
+        "series",
+        "tv show",
+        "tv series",
+        "show me a show",
+        "something to watch on tv",
+        "a series",
+        "episodes",
+    ]
     if any(s in lower for s in tv_signals):
         state["media_type"] = "tv"
 
     # --- who ---
     if not state["who"]:
-        if any(w in lower for w in ["partner", "girlfriend", "boyfriend", "wife", "husband", "date"]):
+        if any(
+            w in lower
+            for w in ["partner", "girlfriend", "boyfriend", "wife", "husband", "date"]
+        ):
             state["who"] = "partner"
         elif any(w in lower for w in ["solo", "alone", "myself", "by myself"]):
             state["who"] = "solo"
@@ -573,11 +651,19 @@ def _extract_intake(text: str, state: dict) -> dict:
 
     # --- second vibe (we can't agree / mixed mood) ---
     if not state["vibe2"] and state["vibe"]:
-        for trigger in ["they want", "she wants", "he wants", "partner wants",
-                        "friend wants", "but also", "mix of", "and also"]:
+        for trigger in [
+            "they want",
+            "she wants",
+            "he wants",
+            "partner wants",
+            "friend wants",
+            "but also",
+            "mix of",
+            "and also",
+        ]:
             idx = lower.find(trigger)
             if idx != -1:
-                remainder = text[idx + len(trigger):].strip()
+                remainder = text[idx + len(trigger) :].strip()
                 for kw in _VIBE_KEYWORDS:
                     if kw in remainder.lower():
                         if kw != state["vibe"]:
@@ -593,38 +679,61 @@ def _extract_intake(text: str, state: dict) -> dict:
     # --- runtime cap ---
     if state["max_runtime"] is None:
         # "under 2 hours", "less than 2 hours"
-        m = re.search(r'(?:under|less than|max|within|no more than)\s+(\d+(?:\.\d+)?)\s*(?:hour|hr)', lower)
+        m = re.search(
+            r"(?:under|less than|max|within|no more than)\s+(\d+(?:\.\d+)?)\s*(?:hour|hr)",
+            lower,
+        )
         if m:
             state["max_runtime"] = int(float(m.group(1)) * 60)
         else:
             # "under 90 minutes"
-            m = re.search(r'(?:under|less than|max|within|no more than)\s+(\d+)\s*(?:minute|min)', lower)
+            m = re.search(
+                r"(?:under|less than|max|within|no more than)\s+(\d+)\s*(?:minute|min)",
+                lower,
+            )
             if m:
                 state["max_runtime"] = int(m.group(1))
-            elif "short film" in lower or "quick watch" in lower or "short movie" in lower:
+            elif (
+                "short film" in lower
+                or "quick watch" in lower
+                or "short movie" in lower
+            ):
                 state["max_runtime"] = 90
 
     # --- reference movie/show ---
     if not state["reference"]:
-        for trigger in ["loved ", "like ", "enjoyed ", "watched ", "similar to ", "fan of "]:
+        for trigger in [
+            "loved ",
+            "like ",
+            "enjoyed ",
+            "watched ",
+            "similar to ",
+            "fan of ",
+        ]:
             # only pick up as reference if NOT preceded by "i've" / "already"
             idx = lower.find(trigger)
             if idx != -1:
-                pre = lower[max(0, idx - 10):idx]
+                pre = lower[max(0, idx - 10) : idx]
                 if "seen" in pre or "already" in pre or "i've" in pre:
                     continue
-                remainder = text[idx + len(trigger):]
+                remainder = text[idx + len(trigger) :]
                 words = remainder.split()[:5]
                 state["reference"] = " ".join(words).strip(".,!?")
                 break
 
     # --- seen-it list ---
-    seen_triggers = ["i've seen ", "i have seen ", "already seen ", "already watched ",
-                     "seen it", "i saw "]
+    seen_triggers = [
+        "i've seen ",
+        "i have seen ",
+        "already seen ",
+        "already watched ",
+        "seen it",
+        "i saw ",
+    ]
     for trigger in seen_triggers:
         idx = lower.find(trigger)
         if idx != -1 and trigger not in ("seen it",):
-            remainder = text[idx + len(trigger):]
+            remainder = text[idx + len(trigger) :]
             words = remainder.split()[:5]
             title = " ".join(words).strip(".,!?")
             if title and title not in state["seen_titles"]:
@@ -641,6 +750,7 @@ def _intake_complete(state: dict) -> bool:
 # ---------------------------------------------------------------------------
 # Tool-use loop
 # ---------------------------------------------------------------------------
+
 
 def _build_system_prompt(state: dict) -> str:
     base = _TV_SYSTEM_PROMPT if state["media_type"] == "tv" else _MOVIE_SYSTEM_PROMPT
@@ -674,20 +784,26 @@ def _format_picks(picks: list[dict]) -> str:
     """Deterministic formatting — LLM supplies raw data, we control every character."""
     lines = []
     for p in picks:
-        vibe      = p.get("vibe", "").strip()
-        title     = p.get("title", "").strip()
-        runtime   = p.get("runtime", "").strip()
-        reason    = p.get("reason", "").strip().rstrip(".")
+        vibe = p.get("vibe", "").strip()
+        title = p.get("title", "").strip()
+        runtime = p.get("runtime", "").strip()
+        reason = p.get("reason", "").strip().rstrip(".")
         streaming = p.get("streaming", "").strip()
         runtime_part = f" ({runtime})" if runtime else ""
-        lines.append(f"• **{vibe}** *{title}*{runtime_part} — {reason}. Stream on: {streaming}")
+        lines.append(
+            f"• **{vibe}** *{title}*{runtime_part} — {reason}. Stream on: {streaming}"
+        )
     return "\n\n".join(lines)
 
 
 async def run_tool_loop(messages: list[dict], state: dict) -> str:
     """Call ASI1 with tool schemas; execute tool calls until finish is called."""
-    tool_functions = TV_TOOL_FUNCTIONS if state["media_type"] == "tv" else MOVIE_TOOL_FUNCTIONS
-    tool_schemas = TV_TOOL_SCHEMAS if state["media_type"] == "tv" else MOVIE_TOOL_SCHEMAS
+    tool_functions = (
+        TV_TOOL_FUNCTIONS if state["media_type"] == "tv" else MOVIE_TOOL_FUNCTIONS
+    )
+    tool_schemas = (
+        TV_TOOL_SCHEMAS if state["media_type"] == "tv" else MOVIE_TOOL_SCHEMAS
+    )
     finish_only = [s for s in tool_schemas if s["function"]["name"] == "finish"]
 
     system_msg = {"role": "system", "content": _build_system_prompt(state)}
@@ -696,25 +812,27 @@ async def run_tool_loop(messages: list[dict], state: dict) -> str:
     tool_call_count = 0
     FORCE_FINISH_AFTER = 8  # inject a nudge; hard-force finish after 10
 
-    for iteration in range(15):
+    for _ in range(15):
         # After threshold, force the model to call finish
         if tool_call_count >= FORCE_FINISH_AFTER:
-            loop_messages.append({
-                "role": "user",
-                "content": (
-                    "You have gathered enough information. "
-                    "Stop searching and call finish NOW with your best picks. "
-                    "Include rent/buy options if streaming isn't available."
-                ),
-            })
-            response = await asi1_client.chat.completions.create(
+            loop_messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "You have gathered enough information. "
+                        "Stop searching and call finish NOW with your best picks. "
+                        "Include rent/buy options if streaming isn't available."
+                    ),
+                }
+            )
+            response = await asi1_client.chat.completions.create(  # type: ignore[call-overload]
                 model=ASI1_MODEL,
                 messages=loop_messages,
                 tools=finish_only,
                 tool_choice={"type": "function", "function": {"name": "finish"}},
             )
         else:
-            response = await asi1_client.chat.completions.create(
+            response = await asi1_client.chat.completions.create(  # type: ignore[call-overload]
                 model=ASI1_MODEL,
                 messages=loop_messages,
                 tools=tool_schemas,
@@ -725,20 +843,27 @@ async def run_tool_loop(messages: list[dict], state: dict) -> str:
         tool_calls = choice.message.tool_calls or []
 
         if not tool_calls:
-            return choice.message.content or "Sorry, I ran into trouble. Please try again."
+            return (
+                choice.message.content or "Sorry, I ran into trouble. Please try again."
+            )
 
-        loop_messages.append({
-            "role": "assistant",
-            "content": None,
-            "tool_calls": [
-                {
-                    "id": tc.id,
-                    "type": "function",
-                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
-                }
-                for tc in tool_calls
-            ],
-        })
+        loop_messages.append(
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        },
+                    }
+                    for tc in tool_calls
+                ],
+            }
+        )
 
         for tc in tool_calls:
             fn_name = tc.function.name
@@ -760,11 +885,13 @@ async def run_tool_loop(messages: list[dict], state: dict) -> str:
                 except Exception as exc:
                     result = json.dumps({"error": str(exc)})
 
-            loop_messages.append({
-                "role": "tool",
-                "tool_call_id": tc.id,
-                "content": result,
-            })
+            loop_messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": result,
+                }
+            )
 
     return "Sorry, I ran into trouble finding good picks. Please try again."
 
@@ -773,10 +900,13 @@ async def run_tool_loop(messages: list[dict], state: dict) -> str:
 # Special intent handlers
 # ---------------------------------------------------------------------------
 
+
 def _handle_show_watchlist(state: dict) -> str:
     if not state["watchlist"]:
         return "Your watchlist is empty. After I give you recommendations, say 'save it' or 'save [title]' to add picks."
-    lines = [f"Your watchlist ({len(state['watchlist'])} title{'s' if len(state['watchlist']) != 1 else ''}):\n"]
+    lines = [
+        f"Your watchlist ({len(state['watchlist'])} title{'s' if len(state['watchlist']) != 1 else ''}):\n"
+    ]
     for i, item in enumerate(state["watchlist"], 1):
         lines.append(f"{i}. {item['title']}")
     return "\n".join(lines)
@@ -785,7 +915,7 @@ def _handle_show_watchlist(state: dict) -> str:
 def _handle_save_watchlist(state: dict, user_text: str = "") -> str:
     title = _extract_specific_title(user_text) if user_text else None
     if not title:
-        return "Tell me which title to save — e.g. \"save The Dark Knight\"."
+        return 'Tell me which title to save — e.g. "save The Dark Knight".'
     already = [w["title"].lower() for w in state["watchlist"]]
     if title.lower() not in already:
         state["watchlist"].append({"title": title})
@@ -813,9 +943,6 @@ def _handle_show_seen(state: dict) -> str:
 # Message helpers
 # ---------------------------------------------------------------------------
 
-from datetime import datetime, timezone
-from uuid import uuid4
-
 
 def _make_chat_message(text: str) -> ChatMessage:
     return ChatMessage(
@@ -828,6 +955,7 @@ def _make_chat_message(text: str) -> ChatMessage:
 # ---------------------------------------------------------------------------
 # Message handler
 # ---------------------------------------------------------------------------
+
 
 @chat_proto.on_message(ChatAcknowledgement)
 async def on_ack(ctx: Context, sender: str, msg: ChatAcknowledgement) -> None:
