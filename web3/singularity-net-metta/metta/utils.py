@@ -1,22 +1,20 @@
-
 import json
 from openai import OpenAI
 from .medicalrag import MedicalRAG
 
+
 class LLM:
     def __init__(self, api_key):
-        self.client = OpenAI(
-            api_key=api_key,
-            base_url="https://api.asi1.ai/v1"
-        )
+        self.client = OpenAI(api_key=api_key, base_url="https://api.asi1.ai/v1")
 
     def create_completion(self, prompt, max_tokens=200):
         completion = self.client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
             model="asi1-mini",  # ASI:One model name
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
         )
         return completion.choices[0].message.content
+
 
 def get_intent_and_keyword(query, llm):
     """Use ASI:One API to classify intent and extract a keyword."""
@@ -26,8 +24,8 @@ def get_intent_and_keyword(query, llm):
         "Extract the most relevant keyword (e.g., a symptom, disease, or treatment) from the query.\n"
         "Return *only* the result in JSON format like this, with no additional text:\n"
         "{\n"
-        "  \"intent\": \"<classified_intent>\",\n"
-        "  \"keyword\": \"<extracted_keyword>\"\n"
+        '  "intent": "<classified_intent>",\n'
+        '  "keyword": "<extracted_keyword>"\n'
         "}"
     )
     response = llm.create_completion(prompt)
@@ -42,6 +40,7 @@ def get_intent_and_keyword(query, llm):
     except (json.JSONDecodeError, KeyError):
         print(f"Error parsing ASI:One response: {response}")
         return "unknown", None
+
 
 def generate_knowledge_response(query, intent, keyword, llm):
     """Use ASI:One to generate a response for new knowledge based on intent."""
@@ -73,6 +72,7 @@ def generate_knowledge_response(query, intent, keyword, llm):
         return None
     return llm.create_completion(prompt)
 
+
 def process_query(query, rag: MedicalRAG, llm: LLM):
     intent, keyword = get_intent_and_keyword(query, llm)
     print(f"Intent: {intent}, Keyword: {keyword}")
@@ -102,7 +102,9 @@ def process_query(query, rag: MedicalRAG, llm: LLM):
             rag.add_knowledge("symptom", keyword, disease)
             print(f"Knowledge graph updated - Added symptom: '{keyword}' → '{disease}'")
             treatments = rag.get_treatment(disease) or ["rest, consult a doctor"]
-            side_effects = [rag.get_side_effects(t) for t in treatments] if treatments else []
+            side_effects = (
+                [rag.get_side_effects(t) for t in treatments] if treatments else []
+            )
             prompt = (
                 f"Query: '{query}'\n"
                 f"Symptom: {keyword}\n"
@@ -114,7 +116,9 @@ def process_query(query, rag: MedicalRAG, llm: LLM):
         else:
             disease = diseases[0]
             treatments = rag.get_treatment(disease)
-            side_effects = [rag.get_side_effects(t) for t in treatments] if treatments else []
+            side_effects = (
+                [rag.get_side_effects(t) for t in treatments] if treatments else []
+            )
             prompt = (
                 f"Query: '{query}'\n"
                 f"Symptom: {keyword}\n"
@@ -128,7 +132,9 @@ def process_query(query, rag: MedicalRAG, llm: LLM):
         if not treatments:
             treatment = generate_knowledge_response(query, intent, keyword, llm)
             rag.add_knowledge("treatment", keyword, treatment)
-            print(f"Knowledge graph updated - Added treatment: '{keyword}' → '{treatment}'")
+            print(
+                f"Knowledge graph updated - Added treatment: '{keyword}' → '{treatment}'"
+            )
             prompt = (
                 f"Query: '{query}'\n"
                 f"Disease: {keyword}\n"
@@ -147,7 +153,9 @@ def process_query(query, rag: MedicalRAG, llm: LLM):
         if not side_effects:
             side_effect = generate_knowledge_response(query, intent, keyword, llm)
             rag.add_knowledge("side_effect", keyword, side_effect)
-            print(f"Knowledge graph updated - Added side effect: '{keyword}' → '{side_effect}'")
+            print(
+                f"Knowledge graph updated - Added side effect: '{keyword}' → '{side_effect}'"
+            )
             prompt = (
                 f"Query: '{query}'\n"
                 f"Treatment: {keyword}\n"
@@ -161,7 +169,7 @@ def process_query(query, rag: MedicalRAG, llm: LLM):
                 f"Side Effects: {', '.join(side_effects)}\n"
                 "Provide a concise explanation of side effects."
             )
-    
+
     if not prompt:
         prompt = f"Query: '{query}'\nNo specific info found. Offer general assistance."
 

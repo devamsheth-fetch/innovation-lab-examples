@@ -2,20 +2,19 @@ import json
 from openai import OpenAI
 from .investment_rag import InvestmentRAG
 
+
 class LLM:
     def __init__(self, api_key):
-        self.client = OpenAI(
-            api_key=api_key,
-            base_url="https://api.asi1.ai/v1"
-        )
+        self.client = OpenAI(api_key=api_key, base_url="https://api.asi1.ai/v1")
 
     def create_completion(self, prompt, max_tokens=200):
         completion = self.client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
             model="asi1-mini",
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
         )
         return completion.choices[0].message.content
+
 
 def get_intent_and_keyword(query, llm):
     """Use ASI:One API to classify investment intent and extract a keyword."""
@@ -25,8 +24,8 @@ def get_intent_and_keyword(query, llm):
         "Extract the most relevant keyword (e.g., conservative, aggressive, retirement, technology, bonds) from the query.\n"
         "Return *only* the result in JSON format like this, with no additional text:\n"
         "{\n"
-        "  \"intent\": \"<classified_intent>\",\n"
-        "  \"keyword\": \"<extracted_keyword>\"\n"
+        '  "intent": "<classified_intent>",\n'
+        '  "keyword": "<extracted_keyword>"\n'
         "}"
     )
     response = llm.create_completion(prompt)
@@ -41,6 +40,7 @@ def get_intent_and_keyword(query, llm):
     except (json.JSONDecodeError, KeyError):
         print(f"Error parsing ASI:One response: {response}")
         return "unknown", None
+
 
 def generate_knowledge_response(query, intent, keyword, llm):
     """Use ASI:One to generate a response for new knowledge based on intent."""
@@ -84,6 +84,7 @@ def generate_knowledge_response(query, intent, keyword, llm):
         return None
     return llm.create_completion(prompt)
 
+
 def process_query(query, rag: InvestmentRAG, llm: LLM):
     intent, keyword = get_intent_and_keyword(query, llm)
     print(f"Intent: {intent}, Keyword: {keyword}")
@@ -111,7 +112,9 @@ def process_query(query, rag: InvestmentRAG, llm: LLM):
         if not investments:
             investment_types = generate_knowledge_response(query, intent, keyword, llm)
             rag.add_knowledge("risk_profile", keyword, investment_types)
-            print(f"Knowledge graph updated - Added risk profile: '{keyword}' → '{investment_types}'")
+            print(
+                f"Knowledge graph updated - Added risk profile: '{keyword}' → '{investment_types}'"
+            )
             prompt = (
                 f"Query: '{query}'\n"
                 f"Risk Profile: {keyword}\n"
@@ -123,12 +126,14 @@ def process_query(query, rag: InvestmentRAG, llm: LLM):
             for investment in investments:
                 returns = rag.get_expected_return(investment)
                 risks = rag.get_risk_level(investment)
-                investment_details.append({
-                    'type': investment,
-                    'returns': returns[0] if returns else 'N/A',
-                    'risks': risks[0] if risks else 'N/A'
-                })
-            
+                investment_details.append(
+                    {
+                        "type": investment,
+                        "returns": returns[0] if returns else "N/A",
+                        "risks": risks[0] if risks else "N/A",
+                    }
+                )
+
             prompt = (
                 f"Query: '{query}'\n"
                 f"Risk Profile: {keyword}\n"
@@ -141,7 +146,9 @@ def process_query(query, rag: InvestmentRAG, llm: LLM):
         if not returns:
             return_info = generate_knowledge_response(query, intent, keyword, llm)
             rag.add_knowledge("expected_return", keyword, return_info)
-            print(f"Knowledge graph updated - Added returns: '{keyword}' → '{return_info}'")
+            print(
+                f"Knowledge graph updated - Added returns: '{keyword}' → '{return_info}'"
+            )
             prompt = (
                 f"Query: '{query}'\n"
                 f"Investment: {keyword}\n"
@@ -161,7 +168,9 @@ def process_query(query, rag: InvestmentRAG, llm: LLM):
         if not allocation:
             allocation_advice = generate_knowledge_response(query, intent, keyword, llm)
             rag.add_knowledge("age_allocation", keyword, allocation_advice)
-            print(f"Knowledge graph updated - Added allocation: '{keyword}' → '{allocation_advice}'")
+            print(
+                f"Knowledge graph updated - Added allocation: '{keyword}' → '{allocation_advice}'"
+            )
             prompt = (
                 f"Query: '{query}'\n"
                 f"Age Group: {keyword}\n"
@@ -180,7 +189,9 @@ def process_query(query, rag: InvestmentRAG, llm: LLM):
         if not strategies:
             strategy = generate_knowledge_response(query, intent, keyword, llm)
             rag.add_knowledge("goal_strategy", keyword, strategy)
-            print(f"Knowledge graph updated - Added goal strategy: '{keyword}' → '{strategy}'")
+            print(
+                f"Knowledge graph updated - Added goal strategy: '{keyword}' → '{strategy}'"
+            )
             prompt = (
                 f"Query: '{query}'\n"
                 f"Investment Goal: {keyword}\n"
@@ -199,7 +210,9 @@ def process_query(query, rag: InvestmentRAG, llm: LLM):
         if not stocks:
             sector_info = generate_knowledge_response(query, intent, keyword, llm)
             rag.add_knowledge("sector_stocks", keyword, sector_info)
-            print(f"Knowledge graph updated - Added sector: '{keyword}' → '{sector_info}'")
+            print(
+                f"Knowledge graph updated - Added sector: '{keyword}' → '{sector_info}'"
+            )
             prompt = (
                 f"Query: '{query}'\n"
                 f"Sector: {keyword}\n"
@@ -213,7 +226,7 @@ def process_query(query, rag: InvestmentRAG, llm: LLM):
                 f"Top Performers: {', '.join(stocks)}\n"
                 "Provide sector analysis and investment recommendations."
             )
-    
+
     if not prompt:
         prompt = f"Query: '{query}'\nNo specific investment information found. Provide general investment guidance and suggest consulting a financial advisor."
 
