@@ -8,10 +8,6 @@
 
 A Fetch.ai multi-agent system that turns a photo of a broken appliance or vehicle part into a complete DIY repair plan. Gemini Vision identifies the part, Bright Data scrapes the cheapest price from 6+ retailers, and YouTube Data API finds the best repair tutorial — all in parallel.
 
-## Demo
-
-![ASI:One Demo](./assets/demo.png)
-
 ## Agent Profile
 
 [View Agent on Agentverse](https://agentverse.ai/inspect/?uri=http%3A//127.0.0.1%3A8001&address=agent1qv5c0vjykr5j3qd0rl9qx423jdy7tz92ph2dr4l0stalgm20er2usfew9cc)
