@@ -74,6 +74,12 @@ def generate_knowledge_response(query, intent, keyword, llm):
             f"The investment goal '{keyword}' has no strategy in my knowledge base. Suggest appropriate investment approaches.\n"
             f"Return *only* the strategy, no additional text."
         )
+    elif intent == "sector":
+        prompt = (
+            f"Query: '{query}'\n"
+            f"The sector '{keyword}' has no stock list in my knowledge base. Suggest a few plausible example companies or tickers for this sector.\n"
+            f"Return *only* a short comma-separated list or one sentence, no additional text."
+        )
     elif intent == "faq":
         prompt = (
             f"Query: '{query}'\n"
@@ -209,10 +215,15 @@ def process_query(query, rag: InvestmentRAG, llm: LLM):
         stocks = rag.query_sector_stocks(keyword)
         if not stocks:
             sector_info = generate_knowledge_response(query, intent, keyword, llm)
-            rag.add_knowledge("sector_stocks", keyword, sector_info)
-            print(
-                f"Knowledge graph updated - Added sector: '{keyword}' → '{sector_info}'"
-            )
+            if not sector_info:
+                sector_info = (
+                    "No specific names generated; consider sector index funds or ETFs."
+                )
+            else:
+                rag.add_knowledge("sector_stocks", keyword, sector_info)
+                print(
+                    f"Knowledge graph updated - Added sector: '{keyword}' → '{sector_info}'"
+                )
             prompt = (
                 f"Query: '{query}'\n"
                 f"Sector: {keyword}\n"
