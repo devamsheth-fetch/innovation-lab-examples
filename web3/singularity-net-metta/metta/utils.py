@@ -48,20 +48,20 @@ def generate_knowledge_response(query, intent, keyword, llm):
     if intent == "symptom":
         prompt = (
             f"Query: '{query}'\n"
-            "The symptom '{keyword}' is not in my knowledge base. Suggest a plausible disease it might be linked to.\n"
-            "Return *only* the disease name, no additional text."
+            f"The symptom '{keyword}' is not in my knowledge base. Suggest a plausible disease it might be linked to.\n"
+            f"Return *only* the disease name, no additional text."
         )
     elif intent == "treatment":
         prompt = (
             f"Query: '{query}'\n"
-            "The disease or condition '{keyword}' has no known treatments in my knowledge base. Suggest a plausible treatment.\n"
-            "Return *only* the treatment description, no additional text."
+            f"The disease or condition '{keyword}' has no known treatments in my knowledge base. Suggest a plausible treatment.\n"
+            f"Return *only* the treatment description, no additional text."
         )
     elif intent == "side effect":
         prompt = (
             f"Query: '{query}'\n"
-            "The treatment '{keyword}' has no known side effects in my knowledge base. Suggest plausible side effects.\n"
-            "Return *only* the side effects description, no additional text."
+            f"The treatment '{keyword}' has no known side effects in my knowledge base. Suggest plausible side effects.\n"
+            f"Return *only* the side effects description, no additional text."
         )
     elif intent == "faq":
         prompt = (

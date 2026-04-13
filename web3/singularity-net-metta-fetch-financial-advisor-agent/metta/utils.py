@@ -47,32 +47,32 @@ def generate_knowledge_response(query, intent, keyword, llm):
     if intent == "risk_profile":
         prompt = (
             f"Query: '{query}'\n"
-            "The risk profile '{keyword}' is not in my knowledge base. Suggest plausible investment types for this risk level.\n"
-            "Return *only* the investment types, no additional text."
+            f"The risk profile '{keyword}' is not in my knowledge base. Suggest plausible investment types for this risk level.\n"
+            f"Return *only* the investment types, no additional text."
         )
     elif intent == "investment_advice":
         prompt = (
             f"Query: '{query}'\n"
-            "The investment type '{keyword}' has no specific advice in my knowledge base. Provide general investment guidance.\n"
-            "Return *only* the advice, no additional text."
+            f"The investment type '{keyword}' has no specific advice in my knowledge base. Provide general investment guidance.\n"
+            f"Return *only* the advice, no additional text."
         )
     elif intent == "returns":
         prompt = (
             f"Query: '{query}'\n"
-            "The investment '{keyword}' has no expected return data in my knowledge base. Suggest realistic return expectations.\n"
-            "Return *only* the return information, no additional text."
+            f"The investment '{keyword}' has no expected return data in my knowledge base. Suggest realistic return expectations.\n"
+            f"Return *only* the return information, no additional text."
         )
     elif intent == "allocation":
         prompt = (
             f"Query: '{query}'\n"
-            "The age group '{keyword}' has no allocation strategy in my knowledge base. Suggest appropriate asset allocation.\n"
-            "Return *only* the allocation recommendation, no additional text."
+            f"The age group '{keyword}' has no allocation strategy in my knowledge base. Suggest appropriate asset allocation.\n"
+            f"Return *only* the allocation recommendation, no additional text."
         )
     elif intent == "goal":
         prompt = (
             f"Query: '{query}'\n"
-            "The investment goal '{keyword}' has no strategy in my knowledge base. Suggest appropriate investment approaches.\n"
-            "Return *only* the strategy, no additional text."
+            f"The investment goal '{keyword}' has no strategy in my knowledge base. Suggest appropriate investment approaches.\n"
+            f"Return *only* the strategy, no additional text."
         )
     elif intent == "faq":
         prompt = (

@@ -47,20 +47,20 @@ def generate_knowledge_response(query, intent, keyword, llm):
     if intent == "capability":
         prompt = (
             f"Query: '{query}'\n"
-            "The concept '{keyword}' is not in my knowledge base. Suggest plausible capabilities it might have.\n"
-            "Return *only* the capability description, no additional text."
+            f"The concept '{keyword}' is not in my knowledge base. Suggest plausible capabilities it might have.\n"
+            f"Return *only* the capability description, no additional text."
         )
     elif intent == "solution":
         prompt = (
             f"Query: '{query}'\n"
-            "The problem '{keyword}' has no known solutions in my knowledge base. Suggest a plausible solution.\n"
-            "Return *only* the solution description, no additional text."
+            f"The problem '{keyword}' has no known solutions in my knowledge base. Suggest a plausible solution.\n"
+            f"Return *only* the solution description, no additional text."
         )
     elif intent == "consideration":
         prompt = (
             f"Query: '{query}'\n"
-            "The topic '{keyword}' has no known considerations in my knowledge base. Suggest plausible considerations or limitations.\n"
-            "Return *only* the considerations description, no additional text."
+            f"The topic '{keyword}' has no known considerations in my knowledge base. Suggest plausible considerations or limitations.\n"
+            f"Return *only* the considerations description, no additional text."
         )
     elif intent == "faq":
         prompt = (
