@@ -80,6 +80,12 @@ def generate_knowledge_response(query, intent, keyword, llm):
             f"The sector '{keyword}' has no stock list in my knowledge base. Suggest a few plausible example companies or tickers for this sector.\n"
             f"Return *only* a short comma-separated list or one sentence, no additional text."
         )
+    elif intent == "mistake":
+        prompt = (
+            f"Query: '{query}'\n"
+            f"The mistake or behavior '{keyword}' is not in my knowledge base. Give one short, practical warning for investors.\n"
+            f"Return *only* the warning text, no additional text."
+        )
     elif intent == "faq":
         prompt = (
             f"Query: '{query}'\n"
@@ -237,6 +243,49 @@ def process_query(query, rag: InvestmentRAG, llm: LLM):
                 f"Top Performers: {', '.join(stocks)}\n"
                 "Provide sector analysis and investment recommendations."
             )
+    elif intent == "investment_advice" and keyword:
+        exp = rag.get_expected_return(keyword)
+        risks = rag.get_risk_level(keyword)
+        if exp or risks:
+            prompt = (
+                f"Query: '{query}'\n"
+                f"Investment type: {keyword}\n"
+                f"Expected return (knowledge base): {', '.join(exp) if exp else 'N/A'}\n"
+                f"Risk notes (knowledge base): {', '.join(risks) if risks else 'N/A'}\n"
+                "Synthesize clear investment guidance with appropriate disclaimers."
+            )
+        else:
+            advice = generate_knowledge_response(query, intent, keyword, llm)
+            if not advice:
+                advice = (
+                    "Consider diversified, low-cost options aligned with your horizon; "
+                    "consult a licensed professional for personal advice."
+                )
+            prompt = (
+                f"Query: '{query}'\n"
+                f"Investment type: {keyword}\n"
+                f"Guidance: {advice}\n"
+                "Provide professional investment guidance with disclaimers."
+            )
+    elif intent == "mistake" and keyword:
+        warnings = rag.get_mistake_warning(keyword)
+        if warnings:
+            wtext = ", ".join(warnings)
+        else:
+            wtext = generate_knowledge_response(query, intent, keyword, llm)
+            if not wtext:
+                wtext = "Prioritize diversification, discipline, and awareness of fees and emotions."
+            else:
+                rag.add_knowledge("mistake", keyword, wtext)
+                print(
+                    f"Knowledge graph updated - Added mistake: '{keyword}' → '{wtext}'"
+                )
+        prompt = (
+            f"Query: '{query}'\n"
+            f"Topic / behavior: {keyword}\n"
+            f"Warning(s): {wtext}\n"
+            "Explain clearly for retail investors with professional disclaimers."
+        )
 
     if not prompt:
         prompt = f"Query: '{query}'\nNo specific investment information found. Provide general investment guidance and suggest consulting a financial advisor."
