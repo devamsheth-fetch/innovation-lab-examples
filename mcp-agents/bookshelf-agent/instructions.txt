@@ -1,0 +1,39 @@
+# MISSION: Develop the "Bookshelf Agent" - Personal Literary Concierge
+# BRAIN: ASI1-Agentic (2026 Flagship Model)
+# STACK: Fetch.ai uagents, PostgreSQL + pgvector, Open Library MCP, Google Maps MCP
+
+## 1. SYSTEM OVERVIEW
+Build a single-agent consumer utility designed to bridge the physical and digital literary worlds. The agent identifies books via vision, manages a persistent semantic memory of "Read" and "Wishlist" titles, and provides real-time local library availability.
+
+## 2. AGENT DEFINITION & CORE SKILLS
+- **Model:** ASI1-Agentic (Operating in Knowledge Graph Mode).
+- **Identity:** A uAgent registered on the Fetch.ai Agentverse.
+- **Skill - Multimodal Identification:** Extract Title, Author, and ISBN from raw image bytes of book covers or spines.
+- **Skill - Semantic Reasoning:** Use internal Knowledge Graph state to relate new scans to existing user history.
+- **Skill - Research & Synthesis:** Call external tools to provide "Vibe Checks," 3-point summaries, and answer deep-dive questions about book content.
+- **Skill - Local Logistics:** Find physical and digital book availability based on user proximity.
+
+## 3. DATA ARCHITECTURE (PERSISTENT MEMORY)
+- **Primary Database:** PostgreSQL with the `pgvector` extension.
+- **Data Retention:** NO automatic purge. All user data is persistent.
+- **Vector Search:** Every book summary must be embedded and stored to allow semantic natural language queries (e.g., "Find a book like the mystery I read last month").
+- **Table Schema:** - `books`: id, isbn, title, author, summary, status (read/wishlist), embedding (vector), created_at.
+- **Privacy Control:** Implement a high-priority "Manual Wipe" handle to TRUNCATE tables and flush the ASI1 internal state on command.
+
+## 4. TOOLSET & INTEGRATIONS
+- **Metadata:** Use `8enSmith/mcp-open-library` MCP to fetch structured bibliographic records.
+- **Content & Availability:** Use the **Open Library Read API** for summaries, text snippets, and global lending status.
+- **Geolocation:** Use `google-maps-mcp-server` to identify library branches near the user (Fremont/San Jose priority).
+- **Reporting:** Implement a PDF Generation tool to create a "Book Snapshot" (Summary, Key Insights, and Library Locations).
+
+## 5. AGENTIC WORKFLOW (THE LOGIC)
+1. **Ingestion:** Receive book image -> Identify via ASI1 Vision -> Check Postgres for duplicates.
+2. **Enrichment:** Query Open Library MCP for metadata -> Call Read API for summary and availability.
+3. **Personalization:** Cross-reference the user's "Read List" and "Wishlist" to provide a tailored "Vibe Check."
+4. **Output:** Provide a rich-text response and update the Postgres database.
+5. **On-Demand:** If the user asks a question or requests a PDF, use the toolset to synthesize the answer or generate the file.
+
+## 6. FINAL ARTIFACTS
+- **README.md:** Must include architecture diagrams, setup instructions for pgvector, and a guide for the "Manual Wipe" command. Ignore $FET payment logic for this version.
+- **Agent Code:** A single-file `uagent` implementation utilizing the ASI1 Python SDK.
+- **Database Script:** SQL for initializing the persistent Postgres schema.
