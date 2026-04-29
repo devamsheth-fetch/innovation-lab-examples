@@ -1,0 +1,24 @@
+# uAgents framework
+uagents==0.24.2
+uagents-adapter==0.4.0
+
+# LangGraph and LangChain
+langgraph>=0.3.0
+langchain>=0.3.0
+langchain-core>=0.3.0
+
+# Graph DB
+neo4j>=5.20.0
+
+# PDF Generation
+reportlab>=4.2.0
+
+# EvoAgentX
+git+https://github.com/EvoAgentX/EvoAgentX.git
+
+# Environment and Data
+pydantic>=2.9.0
+python-dotenv>=1.0.0
+structlog>=23.1.0
+requests>=2.32.0
+arxiv>=3.0.0

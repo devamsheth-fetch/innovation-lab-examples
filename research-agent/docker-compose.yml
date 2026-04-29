@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  memgraph:
+    image: memgraph/memgraph-platform:latest
+    container_name: r2e2_memgraph
+    ports:
+      - "7687:7687"
+      - "3000:3000"
+      - "7444:7444"
+    environment:
+      - MEMGRAPH_PORT=7687
