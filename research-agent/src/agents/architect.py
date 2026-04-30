@@ -2,12 +2,23 @@ from datetime import datetime
 from uuid import uuid4
 import os
 import sys
+import logging
 from uagents import Agent, Context, Model, Protocol
 from pydantic import Field
 from dotenv import load_dotenv
 
 # Ensure src can be imported
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_root)
+
+# Setup message logger to file
+log_file_path = os.path.join(project_root, "messages.log")
+message_logger = logging.getLogger("messages")
+message_logger.setLevel(logging.INFO)
+if not message_logger.handlers:
+    file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
+    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+    message_logger.addHandler(file_handler)
 
 from src.llm import ASI1LLM
 from src.database import db
@@ -99,11 +110,12 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
         ChatAcknowledgement(timestamp=datetime.now(), acknowledged_msg_id=msg.msg_id),
     )
     
-    # Extract text content
     user_input = ""
     for item in msg.content:
         if isinstance(item, TextContent):
             user_input += item.text
+            
+    message_logger.info(f"From {sender}: {user_input}")
     
     # Orchestrate the entire research pipeline via LangGraph
     # Architect is the entry uAgent, and also the first node in the graph
